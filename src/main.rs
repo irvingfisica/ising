@@ -2,9 +2,33 @@ use std::collections::HashMap;
 use std::error::Error;
 use rand::{Rng, RngExt};
 use rand::distr::{Distribution,StandardUniform};
+use std::fmt::Write as FmtWrite;
+use std::io::{self, Write};
+use std::fs::File;
 
-fn main() {
-    println!("Hello, world!");
+fn main() -> Result<(), Box<dyn Error>> {
+
+    let mut rng = rand::rng();
+    let mut sistem = Sistema::square_grid(10, 1.0, 0.0, 0.1);
+
+    let mut mapa = File::create("mapa.txt")?;
+    let mut red = File::create("red.txt")?;
+    let mut fotos = File::create("fotografias.txt")?;
+    let mut magnetizaciones = File::create("magnetizacion.txt")?;
+
+    sistem.escribir_mapa(&mut mapa)?;
+    sistem.escribir_red(&mut red)?;
+
+    writeln!(fotos,"{}",sistem.fotografia())?;
+    writeln!(magnetizaciones,"0,{}",sistem.magnetizacion())?;
+    
+    for it in 1..1000 {
+        sistem.sweep(&mut rng, Dinamica::Glauber)?;
+        writeln!(fotos,"{}",sistem.fotografia())?;
+        writeln!(magnetizaciones,"{},{}",it,sistem.magnetizacion())?;
+    }
+
+    Ok(())
 }
 
 pub struct Sistema {
@@ -17,7 +41,7 @@ pub struct Sistema {
 
 impl Sistema {
 
-    pub fn new_square_grid(n: i32, j: f64, h: f64, temp: f64) -> Self {
+    pub fn square_grid(n: usize, j: f64, h: f64, temp: f64) -> Self {
         let mut sistema = Sistema {
             mapa: HashMap::new(),
             elementos: Vec::new(),
@@ -88,6 +112,28 @@ impl Sistema {
         suma*self.j + self.h
     }
 
+    pub fn magnetizacion(&self) -> f64 {
+        let mut suma = 0.0;
+        for celda in self.elementos.iter() {
+            suma = suma + celda.spin()
+        }
+
+        suma / self.elementos.len() as f64
+    }
+
+    pub fn fotografia(&self) -> String {
+        let mut eactivo = Estado::Positivo;
+        let mut foto = String::new();
+        for (pos,celda) in self.elementos.iter().enumerate() {
+            if celda.estado != eactivo {
+                write!(&mut foto, "{} ", pos).unwrap();
+                eactivo.flip();
+            }
+        }
+
+        foto
+    }
+
     pub fn glauber<R: Rng>(&mut self, pos: usize, rng: &mut R) -> Result<(), Box<dyn Error>> {
         let beta = 1.0/self.temp;
 
@@ -141,6 +187,45 @@ impl Sistema {
         Ok(()) 
 
     }
+
+    pub fn sweep<R: Rng>(&mut self, rng: &mut R, dinamica: Dinamica) -> Result<(), Box<dyn Error>> {
+        for _ in 0..self.elementos.len() {
+            let pos = rng.random_range(0..self.elementos.len());
+            match dinamica {
+                Dinamica::Glauber => self.glauber(pos, rng)?,
+                Dinamica::Metropolis => self.metropolis(pos, rng)?,
+            }
+        };
+
+        Ok(())
+    }
+
+    pub fn escribir_mapa<W: Write>(&self, archivo: &mut W) -> io::Result<()> {
+        for (pos,celda) in self.elementos.iter().enumerate() {
+            writeln!(archivo, "{} {}", pos, celda.id)?;
+        };
+
+        Ok(())
+    }
+
+    pub fn escribir_red<W: Write>(&self, archivo: &mut W) -> io::Result<()> {
+        for (pos, celda) in self.elementos.iter().enumerate() {
+            write!(archivo, "{}", pos)?;
+
+            for vecino in &celda.veclist {
+                write!(archivo, " {}", vecino)?;
+            }
+
+            writeln!(archivo)?;
+        };
+
+        Ok(())
+    }
+}
+
+pub enum Dinamica {
+    Glauber,
+    Metropolis
 }
 
 pub struct Celda {
@@ -187,6 +272,7 @@ impl Celda {
     }
 }
 
+#[derive(PartialEq)]
 pub enum Estado {
     Positivo,
     Negativo
