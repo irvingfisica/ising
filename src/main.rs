@@ -9,7 +9,7 @@ use std::fs::File;
 fn main() -> Result<(), Box<dyn Error>> {
 
     let mut rng = rand::rng();
-    let mut sistem = Sistema::square_grid(10, 1.0, 0.0, 0.1);
+    let mut sistem = Sistema::square_grid(100, 1.0, 0.0, 2.269185, &mut rng);
 
     let mut mapa = File::create("mapa.txt")?;
     let mut red = File::create("red.txt")?;
@@ -41,14 +41,12 @@ pub struct Sistema {
 
 impl Sistema {
 
-    pub fn square_grid(n: usize, j: f64, h: f64, temp: f64) -> Self {
+    pub fn square_grid<R: Rng>(n: usize, j: f64, h: f64, temp: f64, rnd: &mut R) -> Self {
         let mut sistema = Sistema {
             mapa: HashMap::new(),
             elementos: Vec::new(),
             j,h,temp
         };
-
-        let mut rnd = rand::rng();
 
         let mut cta = 0;
         for i_idx in 0..n {
