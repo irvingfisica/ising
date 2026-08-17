@@ -1,35 +1,218 @@
 use std::collections::HashMap;
 use std::error::Error;
+use std::writeln;
 use rand::{Rng, RngExt};
 use rand::distr::{Distribution,StandardUniform};
 use std::fmt::Write as FmtWrite;
-use std::io::{self, Write};
+use std::io::{self, BufWriter, Write};
 use std::fs::File;
+use rand::SeedableRng;
+use rand::rngs::StdRng;
+use rayon::prelude::*;
+
+const L: usize = 100;
+const N_REPLICAS: usize = 100;
+const N_BURNING: usize = 20_000;
+const N_SWEEPS: usize = 10_000;
+
+const TC: f64 = 2.269185;
+
+fn construir_temps() -> Vec<f64> {
+    let mut temperaturas = Vec::new();
+
+    let mut t = 0.1;
+     while t < 1.5 {
+        temperaturas.push(t);
+        t += 0.1;
+    } 
+
+    t = 1.5;
+    while t < 2.0 {
+        temperaturas.push(t);
+        t += 0.025;
+    }
+
+    t = 2.0;
+    while t < 2.5 {
+        temperaturas.push(t);
+        t += 0.005;
+    }
+
+    t = 2.6;
+    while t <= 4.0 {
+        temperaturas.push(t);
+        t += 0.1;
+    }
+
+    temperaturas.push(TC);
+
+    temperaturas.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+    temperaturas.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
+
+    temperaturas
+}
+
+fn simular(temperatura: f64, replica: usize) -> Result<(Vec<f64>,String), Box<dyn Error + Send + Sync>> {
+    let seed =
+        temperatura.to_bits()
+        ^ (replica as u64)
+            .wrapping_mul(0x9E3779B97F4A7C15);
+
+    let mut rng = StdRng::seed_from_u64(seed);
+
+    let inicial = if temperatura < TC {
+        Inicial::Postivo
+    } else {
+        Inicial::Random
+    };
+
+    let mut sistema = Sistema::square_grid(
+        L,
+        1.0,
+        0.0,
+        temperatura,
+        inicial,
+        &mut rng,
+    );
+
+    for _ in 0..N_BURNING {
+        sistema.sweep(
+            &mut rng,
+            Dinamica::Glauber,
+        ).map_err(|e| format!("{e}"))?;
+    }
+
+    let mut serie = Vec::with_capacity(N_SWEEPS);
+
+    for _ in 0..N_SWEEPS {
+
+        sistema.sweep(
+            &mut rng,
+            Dinamica::Glauber,
+        ).map_err(|e| format!("{e}"))?;
+
+        serie.push(sistema.magnetizacion());
+    }
+
+    let fotografia = sistema.fotografia();
+
+    Ok((serie,fotografia))
+}
+
+fn simular_temperatura(temperatura: f64) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let nombre = format!("resultados/T_{:.6}.csv",temperatura);
+
+    let nombre_fotos = format!(
+        "resultados/fotografias_T_{:.6}.txt",
+        temperatura
+    );
+
+    let archivo = File::create(nombre)?;
+    let mut writer = BufWriter::new(archivo);
+
+    let archivo_fotos = File::create(nombre_fotos)?;
+    let mut writer_fotos = BufWriter::new(archivo_fotos);
+
+    writeln!(writer,"replica,t,M")?;
+
+    let resultados: Vec<_> = (0..N_REPLICAS).into_par_iter()
+        .map(|replica| {
+            let (serie,fotografia) = simular(temperatura, replica)?;
+
+            Ok::<_,Box<dyn Error + Send + Sync>>((replica,serie,fotografia))
+        }).collect::<Result<Vec<_>,_>>()?;
+
+    for (replica, serie,_) in &resultados {
+
+        for (t, magnetizacion) in serie.iter().enumerate() {
+
+            writeln!(
+                writer,
+                "{},{},{:.12}",
+                replica,
+                t,
+                magnetizacion
+            )?;
+        }
+    }
+
+    for (_, _, fotografia) in &resultados {
+
+        writeln!(
+            writer_fotos,
+            "{}",
+            fotografia
+        )?;
+    }
+
+    Ok(())
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
 
-    let mut rng = rand::rng();
-    let mut sistem = Sistema::square_grid(100, 1.0, 0.0, 2.269185, &mut rng);
+    /* let mut rng = rand::rng();
+    let mut temp = 2.269185;
+    //temp = 4.0;
+    let mut sistem = Sistema::square_grid(100, 1.0, 0.0, temp, &mut rng);
 
-    let mut mapa = File::create("mapa.txt")?;
-    let mut red = File::create("red.txt")?;
-    let mut fotos = File::create("fotografias.txt")?;
-    let mut magnetizaciones = File::create("magnetizacion.txt")?;
+    let mut mapa = File::create("mapa_tc.txt")?;
+    let mut red = File::create("red_tc.txt")?;
+    let mut fotos = File::create("fotografias_tc.txt")?;
+    let mut magnetizaciones = File::create("magnetizacion_tc.csv")?;
 
     sistem.escribir_mapa(&mut mapa)?;
     sistem.escribir_red(&mut red)?;
 
     writeln!(fotos,"{}",sistem.fotografia())?;
+    writeln!(magnetizaciones,"t,M")?;
     writeln!(magnetizaciones,"0,{}",sistem.magnetizacion())?;
     
-    for it in 1..1000 {
+    for it in 1..10000 {
         sistem.sweep(&mut rng, Dinamica::Glauber)?;
         writeln!(fotos,"{}",sistem.fotografia())?;
         writeln!(magnetizaciones,"{},{}",it,sistem.magnetizacion())?;
     }
 
+    Ok(()) */
+
+    let temperaturas = construir_temps();
+
+    println!(
+        "Temperaturas: {}",
+        temperaturas.len()
+    );
+
+    println!(
+        "Réplicas por temperatura: {}",
+        N_REPLICAS
+    );
+
+    println!(
+        "Burn-in: {} sweeps",
+        N_BURNING
+    );
+
+    println!(
+        "Producción: {} sweeps",
+        N_SWEEPS
+    );
+
+    println!();
+
+    for temperatura in temperaturas {
+
+        println!(
+            "Simulando T = {:.6}",
+            temperatura
+        );
+
+        simular_temperatura(temperatura).map_err(|e| format!("{e}"))?;
+    }
+
     Ok(())
 }
+
 
 pub struct Sistema {
     mapa: HashMap<String,usize>,
@@ -41,7 +224,7 @@ pub struct Sistema {
 
 impl Sistema {
 
-    pub fn square_grid<R: Rng>(n: usize, j: f64, h: f64, temp: f64, rnd: &mut R) -> Self {
+    pub fn square_grid<R: Rng>(n: usize, j: f64, h: f64, temp: f64, inicial: Inicial, rnd: &mut R) -> Self {
         let mut sistema = Sistema {
             mapa: HashMap::new(),
             elementos: Vec::new(),
@@ -52,7 +235,11 @@ impl Sistema {
         for i_idx in 0..n {
             for j_idx in 0..n {
                 let id:String = format!("{i_idx}-{j_idx}");
-                let estado: Estado = rnd.random(); 
+                let estado : Estado = match inicial {
+                    Inicial::Random => rnd.random(),
+                    Inicial::Negativo => Estado::Negativo,
+                    Inicial::Postivo => Estado::Positivo,
+                };
                 let mut celda = Celda::new(&id, estado);
 
                 let up = if j_idx == 0 {
@@ -224,6 +411,12 @@ impl Sistema {
 pub enum Dinamica {
     Glauber,
     Metropolis
+}
+
+pub enum Inicial {
+    Random,
+    Postivo,
+    Negativo
 }
 
 pub struct Celda {
