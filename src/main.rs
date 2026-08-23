@@ -20,13 +20,7 @@ const TC: f64 = 2.269185;
 fn construir_temps() -> Vec<f64> {
     let mut temperaturas = Vec::new();
 
-    let mut t = 0.1;
-     while t < 1.5 {
-        temperaturas.push(t);
-        t += 0.1;
-    } 
-
-    t = 1.5;
+    let mut t = 1.5;
     while t < 2.0 {
         temperaturas.push(t);
         t += 0.025;
