@@ -12,7 +12,8 @@ use crate::sistema::{Sistema, Inicial, Dinamica};
 
 const L: usize = 100;
 const N_REPLICAS: usize = 100;
-const N_BURNING: usize = 20_000;
+const N_BURNING: usize = 30_000;
+//const N_BURNING: usize = 0;
 const N_SWEEPS: usize = 10_000;
 
 const TC: f64 = 2.269185;
@@ -84,15 +85,15 @@ pub fn construir_temps_propors() -> Vec<(f64,f32)> {
     let mut t = 1.5;
 
     while t < 2.0 {
-        for p in (0..=10).map(|i| i as f32 / 10.0) {
+        for p in (0..=20).map(|i| i as f32 / 20.0) {
             tuplas.push((t,p));
         }
-        t += 0.5;
+        t += 0.1;
     }
 
     t = 2.0;
     while t < TC {
-        for p in (0..=10).map(|i| i as f32 / 10.0) {
+        for p in (0..=20).map(|i| i as f32 / 20.0) {
             tuplas.push((t,p));
         }
         t += 0.05;
