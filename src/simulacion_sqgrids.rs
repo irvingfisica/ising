@@ -212,6 +212,69 @@ fn simular(temperatura: f64, replica: usize) -> Result<(Vec<f64>,String), Box<dy
 
 }
 
+pub fn simular_instancia(temperatura: f64, inicial: Inicial, replica: usize, carpeta: &Path) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let seed = generar_seed(temperatura, 0.0, replica);
+
+    let mut rng = StdRng::seed_from_u64(seed);
+
+    let nombre = carpeta.join("series")
+        .join(format!("T_{:.6}.txt",temperatura));
+
+    let nombre_fotos = carpeta.join("fotos")
+        .join(format!("T_{:.6}.txt",temperatura));
+
+    let archivo = File::create(nombre)?;
+    let mut writer = BufWriter::new(archivo);
+
+    let archivo_fotos = File::create(nombre_fotos)?;
+    let mut writer_fotos = BufWriter::new(archivo_fotos);
+
+    let mut sistema = Sistema::square_grid(
+        L,
+        1.0,
+        0.0,
+        temperatura,
+        inicial,
+        &mut rng,
+    );
+
+    let dinamica = &Dinamica::Glauber;
+
+    writeln!(writer,"replica,t,M")?;
+
+    for _ in 0..N_BURNING {
+        sistema.sweep(
+            &mut rng,
+            dinamica,
+        ).map_err(|e| format!("{e}"))?;
+    }
+
+    for t in 0..N_SWEEPS {
+
+        sistema.sweep(&mut rng, dinamica).map_err(|e| format!("{e}"))?;
+
+        let magnetizacion = sistema.magnetizacion();
+        let fotografia = sistema.fotografia();
+
+        writeln!(
+                writer,
+                "{},{},{:.12}",
+                replica,
+                t,
+                magnetizacion
+            )?;
+
+        writeln!(
+            writer_fotos,
+            "{}",
+            fotografia
+        )?;
+
+    };
+
+    Ok(())
+}
+
 pub fn simular_temperatura(temperatura: f64, carpeta: &Path) -> Result<(), Box<dyn Error + Send + Sync>> {
 
     let nombre = carpeta.join("series")

@@ -140,15 +140,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "genising"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "rand",
- "rayon",
-]
-
-[[package]]
 name = "getrandom"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -182,6 +173,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f"
 dependencies = [
  "cc",
+]
+
+[[package]]
+name = "ising"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "rand",
+ "rayon",
 ]
 
 [[package]]
