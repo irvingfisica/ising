@@ -4,7 +4,7 @@ use std::writeln;
 use rand::{Rng, RngExt};
 use rand::distr::{Distribution,StandardUniform};
 use std::fmt::Write as FmtWrite;
-use std::io::{self, Write};
+use std::io::{self, Write, BufRead};
 
 pub struct Sistema {
     mapa: HashMap<String,usize>,
@@ -15,6 +15,77 @@ pub struct Sistema {
 }
 
 impl Sistema {
+
+    pub fn from_edges<R: BufRead, G: Rng>(archivo: R, j: f64, h: f64, temp: f64, inicial: Inicial, rng: &mut G) -> Result<Self, Box<dyn Error>> {
+
+        let mut sistema = Sistema {
+            mapa: HashMap::new(),
+            elementos: Vec::new(),
+            j,h,temp
+        };
+
+        let mut conexiones: Vec<(String, String)> = Vec::new();
+
+        for linea in archivo.lines() {
+
+            let linea = linea?;
+
+            let linea = linea.trim();
+
+            if linea.is_empty() {
+                continue;
+            }
+
+            let partes: Vec<&str> = linea.split(',').collect();
+
+            if partes.len() != 2 {
+                return Err(format!("Conexiones mal definidas: '{}'",linea).into());
+            }
+
+            let id_i = partes[0].trim().to_string();
+            let id_j = partes[1].trim().to_string();
+
+            conexiones.push((id_i,id_j));
+        }
+
+        for (id_i, id_j) in &conexiones {
+            for id in [id_i, id_j] {
+                if !sistema.mapa.contains_key(id) {
+
+                    let estado = match inicial {
+                        Inicial::Random => rng.random(),
+                        Inicial::Negativo => Estado::Negativo,
+                        Inicial::Positivo => Estado::Positivo,
+                        Inicial::Parcial(prop) => {
+                            if rng.random::<f32>() < prop {
+                                Estado::Positivo
+                            } else {
+                                Estado::Negativo
+                            }
+                        }
+                    };
+
+                    let pos = sistema.elementos.len();
+
+                    sistema.mapa.insert(id.clone(), pos);
+                    sistema.elementos.push(Celda::new(id, estado))
+                }
+            }
+        }
+
+        for (id_i, id_j) in conexiones {
+            let pos = *sistema.mapa.get(&id_i).ok_or("Nodo inexistente")?;
+            let celda = &mut sistema.elementos[pos];
+
+            celda.add_vecino(id_j);
+        }
+
+        for ele in sistema.elementos.iter_mut() {
+            ele.seguir_vecinos(&sistema.mapa);
+        }
+
+        Ok(sistema)
+    }
 
     pub fn square_grid<R: Rng>(n: usize, j: f64, h: f64, temp: f64, inicial: Inicial, rnd: &mut R) -> Self {
         let mut sistema = Sistema {
