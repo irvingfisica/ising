@@ -264,15 +264,11 @@ impl Sistema {
     }
 
     pub fn escribir_red<W: Write>(&self, archivo: &mut W) -> io::Result<()> {
-        for (pos, celda) in self.elementos.iter().enumerate() {
-            write!(archivo, "{}", pos)?;
-
-            for vecino in &celda.veclist {
-                write!(archivo, " {}", vecino)?;
+        for celda in &self.elementos {
+            for vecino in &celda.vecinos {
+                writeln!(archivo, "{} {}", celda.id, vecino)?;
             }
-
-            writeln!(archivo)?;
-        };
+        }
 
         Ok(())
     }
