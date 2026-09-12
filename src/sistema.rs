@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::error::Error;
 use std::writeln;
 use rand::{Rng, RngExt};
@@ -11,7 +11,8 @@ pub struct Sistema {
     elementos: Vec<Celda>,
     j: f64,
     h: f64,
-    temp: f64
+    temp: f64,
+    distancias: Option<HashMap<usize, Vec<(usize,usize)>>>
 }
 
 impl Sistema {
@@ -21,7 +22,8 @@ impl Sistema {
         let mut sistema = Sistema {
             mapa: HashMap::new(),
             elementos: Vec::new(),
-            j,h,temp
+            j,h,temp,
+            distancias: None
         };
 
         let mut conexiones: Vec<(String, String)> = Vec::new();
@@ -91,7 +93,8 @@ impl Sistema {
         let mut sistema = Sistema {
             mapa: HashMap::new(),
             elementos: Vec::new(),
-            j,h,temp
+            j,h,temp,
+            distancias: None
         };
 
         let mut cta = 0;
@@ -153,6 +156,66 @@ impl Sistema {
         }
 
         sistema
+    }
+
+    pub fn bfs_desde(&self, origen: usize, r_max: Option<usize>) -> Vec<Option<usize>> {
+        let n = self.elementos.len();
+        let mut dist: Vec<Option<usize>> = vec![None; n];
+        let mut cola: VecDeque<usize> = VecDeque::new();
+
+        dist[origen] = Some(0);
+        cola.push_back(origen);
+
+        while let Some(actual) = cola.pop_front() {
+            let d_actual = dist[actual].unwrap();
+
+            if let Some(limite) = r_max {
+                if d_actual >= limite {
+                    continue;
+                }
+            }
+
+            for &vecino in &self.elementos[actual].veclist {
+                if dist[vecino].is_none() {
+                    dist[vecino] = Some(d_actual + 1);
+                    cola.push_back(vecino);
+                }
+            }
+        }
+
+        dist
+    }
+
+    pub fn calcular_distancias(&mut self, r_max: Option<usize>) {
+        let n = self.elementos.len();
+        let mut parejas: HashMap<usize, Vec<(usize, usize)>> = HashMap::new();
+
+        for origen in 0..n {
+            let distancias = self.bfs_desde(origen, r_max);
+
+            for (destino, dist) in distancias.into_iter().enumerate() {
+                if let Some(d) = dist {
+                    parejas.entry(d).or_insert_with(Vec::new).push((origen, destino));
+                }
+            }
+        }
+
+        self.distancias = Some(parejas);
+    }
+
+    pub fn parejas_a_distancia(&self, r: usize) -> Option<&[(usize, usize)]> {
+        self.distancias.as_ref()?.get(&r).map(|v| v.as_slice())
+    }
+
+    pub fn correlacion(&self, r: usize) -> Option<f64> {
+        let parejas = self.parejas_a_distancia(r)?;
+        if parejas.is_empty() {
+            return None;
+        }
+
+        let suma: f64 = parejas.iter().map(|&(i,j)| self.elementos[i].spin() * self.elementos[j].spin()).sum();
+
+        Some(suma / parejas.len() as f64)
     }
 
     pub fn campo_local(&self,celda: &Celda) -> f64 {
