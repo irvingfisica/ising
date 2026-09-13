@@ -48,6 +48,8 @@ El core incluye:
 - dinámica de Metropolis;
 - inicialización de estados;
 - cálculo de magnetización;
+- cálculo de correlaciones espaciales a distancia `r`;
+- cálculo de clusters y distribución de tamaños;
 - ejecución de sweeps;
 - serialización compacta del estado.
 
@@ -55,7 +57,7 @@ La intención es que esta parte pueda utilizarse para sistemas que no necesariam
 
 ### Experimentos sobre grids
 
-`simulacion_sqgrids` contiene código específico para realizar experimentos sobre grids cuadrados.
+`simulacion_sqgrids` contiene código específico para realizar experimentos sobre grids cuadrados y muestra como usar el core en diversos cálculos.
 
 Esta parte no define el modelo de Ising. Consume la API del core para construir experimentos concretos, por ejemplo:
 
