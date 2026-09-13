@@ -207,6 +207,41 @@ impl Sistema {
         self.distancias.as_ref()?.get(&r).map(|v| v.as_slice())
     }
 
+    pub fn clusters_geometricos(&self) -> UnionFind {
+        let n = self.elementos.len();
+        let mut uf = UnionFind::new(n);
+
+        for (pos, celda) in self.elementos.iter().enumerate() {
+            for &vecino in &celda.veclist {
+                if celda.estado == self.elementos[vecino].estado {
+                    uf.union(pos, vecino);
+                }
+            }
+        }
+
+        uf
+    }
+
+    pub fn clusters_fkw<R: Rng>(&self, rng: &mut R) -> UnionFind {
+        let n = self.elementos.len();
+        let mut uf = UnionFind::new(n);
+        let beta = 1.0 / self.temp;
+        let p = 1.0 - (-2.0 * beta * self.j).exp();
+
+        for (pos, celda) in self.elementos.iter().enumerate() {
+            for &vecino in &celda.veclist {
+                if celda.estado == self.elementos[vecino].estado {
+                    let r: f64 = rng.random();
+                    if r < p {
+                        uf.union(pos, vecino);
+                    }
+                }
+            }
+        }
+
+        uf
+    }
+
     pub fn correlacion(&self, r: usize) -> Option<f64> {
         let parejas = self.parejas_a_distancia(r)?;
         if parejas.is_empty() {
@@ -228,6 +263,19 @@ impl Sistema {
         }
 
         suma*self.j + self.h
+    }
+
+    pub fn tamanios_clusters(&self, uf: &mut UnionFind) -> Vec<usize> {
+        let n = self.elementos.len();
+
+        let mut conteo: HashMap<usize, usize> = HashMap::new();
+
+        for i in 0..n {
+            let raiz = uf.find(i);
+            *conteo.entry(raiz).or_insert(0) += 1;
+        }
+
+        conteo.into_values().collect()
     }
 
     pub fn magnetizacion(&self) -> f64 {
@@ -425,6 +473,39 @@ impl Distribution<Estado> for StandardUniform {
             0 => Estado::Positivo,
             1 => Estado::Negativo,
             _ => unreachable!()
+        }
+    }
+}
+
+pub struct UnionFind {
+    padre: Vec<usize>,
+    rango: Vec<u8>
+}
+
+impl UnionFind {
+    pub fn new(n: usize) -> Self {
+        UnionFind { padre: (0..n).collect(), rango: vec![0;n] }
+    }
+
+    pub fn find(&mut self, x: usize) -> usize {
+        if self.padre[x] != x {
+            self.padre[x] = self.find(self.padre[x]);
+        }
+        self.padre[x]
+    }
+
+    pub fn union(&mut self, a: usize, b: usize) {
+        let ra = self.find(a);
+        let rb = self.find(b);
+        if ra == rb {return;}
+
+        if self.rango[ra] < self.rango[rb] {
+            self.padre[ra] = rb;
+        } else if self.rango[ra] > self.rango[rb] {
+            self.padre[rb] = ra;
+        } else {
+            self.padre[rb] = ra;
+            self.rango[ra] += 1;
         }
     }
 }
