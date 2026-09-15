@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::writeln;
 use rand::{Rng, RngExt};
@@ -12,7 +12,6 @@ pub struct Sistema {
     j: f64,
     h: f64,
     temp: f64,
-    distancias: Option<HashMap<usize, Vec<(usize,usize)>>>
 }
 
 impl Sistema {
@@ -23,7 +22,6 @@ impl Sistema {
             mapa: HashMap::new(),
             elementos: Vec::new(),
             j,h,temp,
-            distancias: None
         };
 
         let mut conexiones: Vec<(String, String)> = Vec::new();
@@ -94,7 +92,6 @@ impl Sistema {
             mapa: HashMap::new(),
             elementos: Vec::new(),
             j,h,temp,
-            distancias: None
         };
 
         let mut cta = 0;
@@ -158,55 +155,6 @@ impl Sistema {
         sistema
     }
 
-    pub fn bfs_desde(&self, origen: usize, r_max: Option<usize>) -> Vec<Option<usize>> {
-        let n = self.elementos.len();
-        let mut dist: Vec<Option<usize>> = vec![None; n];
-        let mut cola: VecDeque<usize> = VecDeque::new();
-
-        dist[origen] = Some(0);
-        cola.push_back(origen);
-
-        while let Some(actual) = cola.pop_front() {
-            let d_actual = dist[actual].unwrap();
-
-            if let Some(limite) = r_max {
-                if d_actual >= limite {
-                    continue;
-                }
-            }
-
-            for &vecino in &self.elementos[actual].veclist {
-                if dist[vecino].is_none() {
-                    dist[vecino] = Some(d_actual + 1);
-                    cola.push_back(vecino);
-                }
-            }
-        }
-
-        dist
-    }
-
-    pub fn calcular_distancias(&mut self, r_max: Option<usize>) {
-        let n = self.elementos.len();
-        let mut parejas: HashMap<usize, Vec<(usize, usize)>> = HashMap::new();
-
-        for origen in 0..n {
-            let distancias = self.bfs_desde(origen, r_max);
-
-            for (destino, dist) in distancias.into_iter().enumerate() {
-                if let Some(d) = dist {
-                    parejas.entry(d).or_insert_with(Vec::new).push((origen, destino));
-                }
-            }
-        }
-
-        self.distancias = Some(parejas);
-    }
-
-    pub fn parejas_a_distancia(&self, r: usize) -> Option<&[(usize, usize)]> {
-        self.distancias.as_ref()?.get(&r).map(|v| v.as_slice())
-    }
-
     pub fn clusters_geometricos(&self) -> UnionFind {
         let n = self.elementos.len();
         let mut uf = UnionFind::new(n);
@@ -242,17 +190,6 @@ impl Sistema {
         uf
     }
 
-    pub fn correlacion(&self, r: usize) -> Option<f64> {
-        let parejas = self.parejas_a_distancia(r)?;
-        if parejas.is_empty() {
-            return None;
-        }
-
-        let suma: f64 = parejas.iter().map(|&(i,j)| self.elementos[i].spin() * self.elementos[j].spin()).sum();
-
-        Some(suma / parejas.len() as f64)
-    }
-
     pub fn campo_local(&self,celda: &Celda) -> f64 {
         let mut suma = 0.0;
         for pos in celda.veclist.iter() {
@@ -285,6 +222,160 @@ impl Sistema {
         }
 
         suma / self.elementos.len() as f64
+    }
+
+    pub fn c1(&self) -> f64 {
+        let mut suma = 0.0;
+        let mut pares = 0;
+        for celda in self.elementos.iter() {
+            let mut suma_parcial = 0.0;
+            for pos in celda.veclist.iter() {
+                if let Some(vcelda) = self.elementos.get(*pos) {
+                    suma_parcial = suma_parcial + vcelda.spin();
+                    pares = pares + 1;
+                }
+            }
+            suma = suma + suma_parcial * celda.spin();
+        }
+
+        if pares == 0 {
+            0.0
+        } else {
+            suma / pares as f64
+        }
+    }
+
+    pub fn magnetizacion_local(&self, frontera: &HashSet<usize>) -> (usize,f64) {
+        let mut suma_local = 0.0;
+        for &celda in frontera {
+            suma_local = suma_local + self.elementos[celda].spin()
+        };
+
+        (frontera.len(),suma_local)
+    }
+
+    pub fn vecindad_local(&self, frontera: &HashSet<usize>, visitados: &mut HashSet<usize>) -> Option<HashSet<usize>> {
+        let mut siguiente = HashSet::new();
+
+        for &celda in frontera {
+            for vecino in &self.elementos[celda].veclist {
+                if visitados.insert(*vecino) {
+                    siguiente.insert(*vecino);
+                }
+            }
+        }
+
+        if siguiente.is_empty() {
+            None
+        } else {
+            Some(siguiente)
+        }
+    }
+
+    pub fn generatriz(&self, origen: &HashSet<usize>, r: usize) -> HashSet<usize> {
+        let mut visitados = origen.clone();
+        let mut frontera = origen.clone();
+
+        for _ in 0..r {
+            match self.vecindad_local(&frontera, &mut visitados) {
+                Some(siguiente) => frontera = siguiente,
+                None => return frontera
+            }
+        };
+
+        frontera
+    }
+
+    pub fn correlacion_local(&self, frontera: &HashSet<usize>, origen: &HashSet<usize>) -> (usize,f64) {
+        let (lf,mf) = self.magnetizacion_local(frontera);
+        let (lo,mo) = self.magnetizacion_local(origen);
+
+        let pares = lf*lo;
+
+        if pares == 0 {
+            (0, 0.0)
+        } else {
+            let c = mf * mo / pares as f64;
+            (pares as usize, c)
+        }
+    }
+
+    pub fn correlacion_local_r(&self, origen: HashSet<usize>, r: usize) -> (usize, f64) {
+
+        let frontera = self.generatriz(&origen, r);
+        self.correlacion_local(&frontera, &origen)
+    }
+
+    pub fn correlaciones_local_r(&self, origen: HashSet<usize>, r: usize) -> Vec<(usize, f64)> {
+        let mut visitados = origen.clone();
+        let mut frontera = origen.clone();
+
+        let mut resultados = Vec::with_capacity(r);
+
+        for _ in 0..r {
+            let siguiente = match self.vecindad_local(&frontera, &mut visitados) {
+                Some(siguiente) => siguiente,
+                None => break,
+            };
+
+            frontera = siguiente;
+
+            let resultado = self.correlacion_local(&frontera, &origen);
+
+            resultados.push(resultado);
+        }
+
+        resultados
+    }
+
+    pub fn correlacion_global_r(&self, r: usize) -> (usize, f64) {
+        let mut suma = 0.0;
+        let mut pares = 0;
+
+        for celda in 0..self.elementos.len() {
+            let mut origen = HashSet::new();
+            origen.insert(celda);
+
+            let (n,c) = self.correlacion_local_r(origen, r);
+
+            suma = suma + c*n as f64;
+            pares = pares + n;
+        }
+
+        if pares == 0 {
+            return (0, 0.0);
+        } else {
+            (pares, suma / pares as f64)
+        }
+    }
+
+    pub fn correlaciones_global_r(&self, r: usize) -> Vec<(usize, f64)> {
+        let mut sumas = vec![0.0; r];
+        let mut pares = vec![0usize; r];
+
+        for celda in 0..self.elementos.len() {
+            let mut origen = HashSet::new();
+            origen.insert(celda);
+
+            let resultados = self.correlaciones_local_r(origen, r);
+
+            for (ri, &(n, c)) in resultados.iter().enumerate() {
+                sumas[ri] = sumas[ri] + c*n as f64;
+                pares[ri] = pares[ri] + n;
+            }
+        }
+
+        let mut resultado = Vec::with_capacity(pares.len());
+
+        for ri in 0..pares.len() {
+            if pares[ri] == 0 {
+                resultado.push((0, 0.0));
+            } else {
+                resultado.push((pares[ri], sumas[ri] / pares[ri] as f64))
+            }
+        };
+
+        resultado
     }
 
     pub fn fotografia(&self) -> String {
