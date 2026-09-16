@@ -457,6 +457,19 @@ impl Sistema {
         Ok(())
     }
 
+    pub fn escribir_resumen<W: Write>(&self, archivo: &mut W) -> io::Result<()> {
+        writeln!(archivo,"N,J,H,T")?;
+
+        let n = self.elementos.len();
+        let j = self.j;
+        let h = self.h;
+        let temp = self.temp;
+
+        writeln!(archivo,"{},{},{},{}",n,j,h,temp)?;
+
+        Ok(())
+    }
+
     pub fn escribir_mapa<W: Write>(&self, archivo: &mut W) -> io::Result<()> {
         for (pos,celda) in self.elementos.iter().enumerate() {
             writeln!(archivo, "{} {}", pos, celda.id)?;
