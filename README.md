@@ -101,13 +101,7 @@ Inicial
 
 `Sistema` mantiene tanto los elementos del sistema como su topología y los parámetros físicos de la simulación.
 
-### `simulacion_sqgrids.rs`
-
-Implementa los experimentos específicos utilizados actualmente para estudiar el modelo sobre un grid cuadrado.
-
-El módulo utiliza `Sistema::square_grid()` para construir la topología y posteriormente ejecuta las dinámicas definidas por el core.
-
-### `bin/`
+### Ejemplos en `examples/`
 
 Los binarios definen experimentos concretos y parámetros de ejecución, mientras que la lógica reutilizable permanece en la librería.
 
@@ -131,6 +125,16 @@ sistema.sweep(&mut rng, &dinamica)?;
 ```
 
 La idea es que el binario determine **qué experimento realizar**, mientras que la librería contiene **cómo funciona el sistema**.
+
+### `examples/metricas.rs`
+
+Este archivo implementa un sistema de Ising básico en una malla cuadrada. Muestra como calcular una gran cantidad de métricas importantes al iterar el sistema. Magnetización, Correlaciones a distancia r, distribución de clusters. **El archivo es un lugar perfecto para empezar y entender como funciona el sistema**.
+
+### `examples/simulacion_sqgrids.rs`
+
+Implementa los experimentos específicos utilizados actualmente para estudiar el modelo sobre un grid cuadrado.
+
+El módulo utiliza `Sistema::square_grid()` para construir la topología y posteriormente ejecuta las dinámicas definidas por el core.
 
 ## Topología
 
