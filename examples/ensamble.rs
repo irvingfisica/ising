@@ -1,7 +1,9 @@
+mod common;
+
 use std::error::Error;
-use ising::simulacion_sqgrids::construir_temps;
-use ising::simulacion_sqgrids::simular_temperatura;
-use ising::simulacion_sqgrids::{crear_carpeta_ejecucion,crear_sistema_base};
+use common::simulacion_sqgrids::construir_temps;
+use common::simulacion_sqgrids::simular_temperatura;
+use common::simulacion_sqgrids::{crear_carpeta_ejecucion,crear_sistema_base};
 
 fn main() -> Result<(), Box<dyn Error>> {
 

@@ -5,5 +5,7 @@ edition = "2024"
 
 [dependencies]
 rand = "0.10.2"
+
+[dev-dependencies]
 rayon = "1.11"
 chrono = "0.4"

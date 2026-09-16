@@ -1,6 +1,8 @@
+mod common;
+
 use std::error::Error;
-use ising::simulacion_sqgrids:: simular_instancia;
-use ising::simulacion_sqgrids::{crear_carpeta_ejecucion,crear_sistema_base};
+use common::simulacion_sqgrids:: simular_instancia;
+use common::simulacion_sqgrids::{crear_carpeta_ejecucion,crear_sistema_base};
 use ising::sistema:: Inicial;
 
 fn main() -> Result<(), Box<dyn Error>> {

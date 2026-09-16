@@ -8,7 +8,7 @@ use rayon::prelude::*;
 use chrono::Local;
 use std::path::{Path,PathBuf};
 
-use crate::sistema::{Sistema, Inicial, Dinamica};
+use ising::sistema::{Sistema, Inicial, Dinamica};
 
 const L: usize = 100;
 const N_REPLICAS: usize = 100;
