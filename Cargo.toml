@@ -5,7 +5,15 @@ edition = "2024"
 
 [dependencies]
 rand = "0.10.2"
+plotters = { version = "0.3", optional = true, default-features = false, features = ["svg_backend", "line_series", "point_series"] }
+
+[features]
+graficas = ["dep:plotters"]
 
 [dev-dependencies]
 rayon = "1.11"
 chrono = "0.4"
+
+[[example]]
+name = "graficas"
+required-features = ["graficas"]

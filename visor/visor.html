@@ -1,0 +1,1352 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visor Ising</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<!-- Generado por ising::visor::instalar(); si no existe, se cargan los CSV a mano. -->
+<script src="datos.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --pagina: #f9f9f7;
+  --superficie: #fcfcfb;
+  --tinta: #0b0b0b;
+  --tinta-2: #52514e;
+  --tenue: #898781;
+  --rejilla: #e1e0d9;
+  --eje: #c3c2b7;
+  --borde: rgba(11,11,11,0.10);
+  --serie-1: #2a78d6;
+  --serie-2: #eb6834;
+  --serie-1-lavado: rgba(42,120,214,0.10);
+  --acento: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --pagina: #0d0d0d;
+    --superficie: #1a1a19;
+    --tinta: #ffffff;
+    --tinta-2: #c3c2b7;
+    --tenue: #898781;
+    --rejilla: #2c2c2a;
+    --eje: #383835;
+    --borde: rgba(255,255,255,0.10);
+    --serie-1: #3987e5;
+    --serie-2: #d95926;
+    --serie-1-lavado: rgba(57,135,229,0.14);
+    --acento: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --pagina: #0d0d0d;
+  --superficie: #1a1a19;
+  --tinta: #ffffff;
+  --tinta-2: #c3c2b7;
+  --tenue: #898781;
+  --rejilla: #2c2c2a;
+  --eje: #383835;
+  --borde: rgba(255,255,255,0.10);
+  --serie-1: #3987e5;
+  --serie-2: #d95926;
+  --serie-1-lavado: rgba(57,135,229,0.14);
+  --acento: #3987e5;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--pagina);
+  color: var(--tinta);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.barra {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 10px 16px;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borde);
+}
+.barra .titulo { font-weight: 600; margin-right: auto; }
+button, select, .boton-archivo, input[type=number] {
+  font: inherit; font-size: 13px;
+  color: var(--tinta);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  padding: 5px 10px;
+}
+button, .boton-archivo { cursor: pointer; }
+button:hover, .boton-archivo:hover { background: var(--pagina); }
+button.primario { background: var(--acento); border-color: var(--acento); color: #fff; }
+button.primario:hover { filter: brightness(1.08); background: var(--acento); }
+.boton-archivo input { display: none; }
+input[type=number] { width: 96px; }
+
+#vacio {
+  max-width: 560px; margin: 64px auto; padding: 40px 24px;
+  text-align: center;
+  border: 2px dashed var(--eje); border-radius: 12px;
+  color: var(--tinta-2);
+}
+#vacio.arrastrando { border-color: var(--acento); background: var(--serie-1-lavado); }
+#vacio h2 { color: var(--tinta); margin-top: 0; font-size: 18px; }
+#vacio code { font-size: 12px; }
+
+main { max-width: 1180px; margin: 0 auto; padding: 16px; }
+.pagina { display: flex; flex-direction: column; gap: 16px; margin-bottom: 32px; }
+
+.encabezado h1 { font-size: 20px; margin: 0 0 4px; }
+.parametros { display: flex; flex-wrap: wrap; gap: 4px 18px; color: var(--tinta-2); font-size: 13px; }
+.parametros b { color: var(--tinta); font-weight: 600; font-variant-numeric: tabular-nums; }
+.nota { color: var(--tenue); font-size: 12px; }
+
+.controles {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+  font-size: 13px; color: var(--tinta-2);
+}
+.controles label { display: inline-flex; align-items: center; gap: 6px; }
+
+.tarjeta {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  padding: 12px 14px 8px;
+  min-width: 0;
+}
+.tarjeta h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.tarjeta .sub { margin: 0 0 6px; font-size: 12px; color: var(--tenue); }
+.rejilla-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 760px) { .rejilla-2 { grid-template-columns: minmax(0, 1fr); } }
+
+.leyenda { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--tinta-2); margin: 2px 0 4px; }
+.leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.leyenda i { display: inline-block; width: 14px; height: 0; border-top: 2px solid; }
+.leyenda i.ref { border-top: 1px dashed var(--tenue); }
+
+.grafica { width: 100%; }
+.grafica svg { display: block; width: 100%; height: auto; overflow: visible; }
+.grafica text { fill: var(--tenue); font-size: 11px; font-variant-numeric: tabular-nums; }
+.grafica .titulo-eje { fill: var(--tinta-2); }
+.grafica .etiqueta-ref { fill: var(--tenue); font-size: 10.5px; }
+.grafica .dominio { stroke: var(--eje); }
+.grafica .tick line { stroke: var(--rejilla); }
+.grafica .linea { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.grafica .ref { fill: none; stroke: var(--tenue); stroke-width: 1; stroke-dasharray: 4 3; }
+.grafica .cursor { stroke: var(--tinta-2); stroke-width: 1; }
+.grafica .punto { stroke: var(--superficie); stroke-width: 2; }
+
+.tabla-envoltura { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 4px 10px; text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--tinta-2); font-weight: 600; border-bottom: 1px solid var(--eje); }
+td { border-bottom: 1px solid var(--rejilla); font-variant-numeric: tabular-nums; }
+td.pm { color: var(--tinta-2); }
+
+#tooltip {
+  position: fixed; pointer-events: none; z-index: 10;
+  background: var(--superficie); color: var(--tinta);
+  border: 1px solid var(--borde); border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 6px 10px; font-size: 12px;
+  opacity: 0; transition: opacity 80ms;
+}
+#tooltip .cab { color: var(--tenue); margin-bottom: 2px; }
+#tooltip .fila { display: flex; align-items: center; gap: 8px; }
+#tooltip .fila i { width: 12px; border-top: 2px solid; }
+#tooltip .fila b { font-variant-numeric: tabular-nums; }
+#tooltip .fila span { color: var(--tinta-2); }
+
+.solo-impresion { display: none; }
+
+/* ---------- Modo impresión: carta, dos páginas ---------- */
+@page { size: letter; margin: 0.45in; }
+body.impresion main { max-width: none; width: 7.6in; padding: 0; margin: 0 auto; }
+body.impresion .pagina { gap: 8px; margin: 0; }
+body.impresion .pagina + .pagina { break-before: page; }
+body.impresion .no-imprimir { display: none !important; }
+body.impresion .solo-impresion { display: block; }
+body.impresion .rejilla-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+body.impresion .tarjeta { padding: 6px 8px 2px; border-radius: 6px; break-inside: avoid; }
+body.impresion .tarjeta h3 { font-size: 11px; }
+body.impresion .tarjeta .sub { font-size: 9px; margin-bottom: 2px; }
+body.impresion .leyenda { font-size: 9px; }
+body.impresion .encabezado h1 { font-size: 15px; }
+body.impresion .parametros { font-size: 10px; }
+body.impresion .nota { font-size: 9px; }
+body.impresion table { font-size: 9.5px; }
+body.impresion th, body.impresion td { padding: 2px 6px; }
+body.impresion .grafica text { font-size: 8.5px; }
+body.impresion .grafica .etiqueta-ref { font-size: 8px; }
+
+@media print {
+  :root, :root[data-theme="dark"] {
+    color-scheme: light;
+    --pagina: #ffffff; --superficie: #ffffff;
+    --tinta: #0b0b0b; --tinta-2: #52514e; --tenue: #6f6d68;
+    --rejilla: #e1e0d9; --eje: #c3c2b7; --borde: rgba(11,11,11,0.18);
+    --serie-1: #2a78d6; --serie-2: #eb6834;
+    --serie-1-lavado: rgba(42,120,214,0.10);
+  }
+  .barra, #tooltip, #vacio { display: none !important; }
+  body { background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+
+<div class="barra no-imprimir">
+  <span class="titulo">Visor Ising</span>
+  <label class="boton-archivo">Abrir carpeta…<input id="entrada-carpeta" type="file" webkitdirectory multiple></label>
+  <label class="boton-archivo">Abrir archivos…<input id="entrada-archivos" type="file" accept=".csv" multiple></label>
+  <button id="boton-tema" type="button">Tema</button>
+  <button id="boton-pdf" class="primario" type="button" disabled>Generar PDF</button>
+</div>
+
+<div id="vacio">
+  <h2>Sin datos cargados</h2>
+  <p>Arrastra aquí la carpeta de salida de un experimento (o sus CSV), o usa <em>Abrir carpeta…</em>.</p>
+  <p class="nota">Para abrir este visor con doble clic y los datos ya cargados, genera <code>datos.js</code> con
+    <code>ising::visor::instalar("datos")</code>.</p>
+</div>
+
+<main id="reporte" hidden>
+
+  <!-- ===================== PÁGINA 1 ===================== -->
+  <section class="pagina">
+    <div class="encabezado">
+      <h1>Modelo de Ising · resumen del experimento</h1>
+      <div class="parametros" id="parametros"></div>
+      <div class="nota" id="nota-ventana"></div>
+    </div>
+
+    <div class="tarjeta no-imprimir">
+      <h3>Ventana de análisis</h3>
+      <p class="sub">Arrastra sobre la serie para elegir el rango de sweeps; todas las estadísticas y gráficas se recalculan. Doble clic para restablecer.</p>
+      <div class="grafica" id="g-ventana"></div>
+      <div class="controles" style="margin:6px 0 4px">
+        <label>Desde <input type="number" id="ventana-desde" min="0"></label>
+        <label>hasta <input type="number" id="ventana-hasta" min="0"></label>
+        <button type="button" id="ventana-aplicar">Aplicar</button>
+        <button type="button" id="ventana-todo">Restablecer</button>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h3>Estadísticas</h3>
+      <p class="sub">Error estándar corregido por autocorrelación: √(2 τ<sub>int</sub> var / n). n<sub>ef</sub> = n / 2τ<sub>int</sub>.</p>
+      <div class="tabla-envoltura"><table id="tabla"></table></div>
+      <div class="parametros" id="derivados" style="margin:6px 0 4px"></div>
+    </div>
+
+    <div class="rejilla-2" id="series"></div>
+
+    <div class="controles no-imprimir">
+      <label>Métrica <select id="sel-metrica"></select></label>
+      <label>Bins <input type="number" id="sel-bins" min="5" max="200" value="40"></label>
+      <label>Escala de C(r) <select id="sel-escala"><option value="log">log-log</option><option value="lin">lineal</option></select></label>
+      <label><input type="checkbox" id="sel-ref" checked> Referencias críticas</label>
+      <label><input type="checkbox" id="sel-excluir" checked> Excluir el mayor cluster en n(s)</label>
+    </div>
+
+    <div class="rejilla-2">
+      <div class="tarjeta">
+        <h3 id="titulo-hist">Histograma</h3>
+        <p class="sub" id="sub-hist"></p>
+        <div class="grafica" id="g-hist"></div>
+      </div>
+      <div class="tarjeta">
+        <h3 id="titulo-acf">Autocorrelación</h3>
+        <p class="sub" id="sub-acf"></p>
+        <div class="leyenda" id="ley-acf"></div>
+        <div class="grafica" id="g-acf"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== PÁGINA 2 ===================== -->
+  <section class="pagina" id="pagina-2">
+    <div class="encabezado solo-impresion">
+      <h1>Estructura espacial</h1>
+      <div class="parametros" id="parametros-2"></div>
+    </div>
+    <div class="rejilla-2">
+      <div class="tarjeta" id="t-corr">
+        <h3>Correlación espacial</h3>
+        <p class="sub" id="sub-corr"></p>
+        <div class="leyenda" id="ley-corr"></div>
+        <div class="grafica" id="g-corr"></div>
+      </div>
+      <div class="tarjeta" id="t-dist">
+        <h3>Distribución de tamaños de cluster n(s)</h3>
+        <p class="sub" id="sub-dist"></p>
+        <div class="leyenda" id="ley-dist"></div>
+        <div class="grafica" id="g-dist"></div>
+      </div>
+      <div class="tarjeta" id="t-mayor">
+        <h3>Fracción del mayor cluster</h3>
+        <p class="sub" id="sub-mayor"></p>
+        <div class="leyenda" id="ley-mayor"></div>
+        <div class="grafica" id="g-mayor"></div>
+      </div>
+      <div class="tarjeta" id="t-numero">
+        <h3>Número de clusters</h3>
+        <p class="sub" id="sub-numero"></p>
+        <div class="leyenda" id="ley-numero"></div>
+        <div class="grafica" id="g-numero"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="tooltip"></div>
+
+<script>
+"use strict";
+
+// ============================================================
+// ESTADO
+// ============================================================
+
+const estado = {
+  params: null,        // {N, J, H, T, dinamica, burn_in, mediciones, ...}
+  serie: null,         // {cada, sweeps: Float64Array, metricas: {nombre: Float64Array}}
+  correlaciones: null, // [{r, pares, C, Cc}]
+  clusters: {},        // {geo|fk: {cada, snapshots: [{sweep, tamanios}]}}
+  N: null,
+  ventana: null,       // [desde, hasta] en sweeps
+  metrica: null,
+  bins: 40,
+  escalaCorr: "log",
+  referencias: true,
+  excluirMayor: true,
+  cache: null,
+};
+
+const NOMBRES = {
+  M: "Magnetización m",
+  abs_M: "|m|",
+  E: "Energía por espín e",
+  C1: "Correlación a primeros vecinos C1",
+  M2: "m²",
+};
+const nombreMetrica = (k) => NOMBRES[k] || k;
+
+const SERIES_CLUSTERS = [
+  { clave: "geo", nombre: "Geométricos", color: "var(--serie-1)", tau: 379 / 187, tauTxt: "379/187" },
+  { clave: "fk", nombre: "FK", color: "var(--serie-2)", tau: 31 / 15, tauTxt: "31/15" },
+];
+
+const fmt = d3.format(".5~g");
+const fmtCorto = d3.format(".3~g");
+const fmtEntero = d3.format(",d");
+
+// ============================================================
+// CARGA DE ARCHIVOS
+// ============================================================
+
+const PATRON = /^(serie|correlaciones|clusters_geometricos|clusters_fk)(?:_cada(\d+))?\.csv$/;
+
+function cargar(archivos) {
+  // archivos: {nombre: texto}
+  const porTipo = {};
+  for (const [ruta, texto] of Object.entries(archivos)) {
+    const nombre = ruta.split(/[\\/]/).pop();
+    const m = nombre.match(PATRON);
+    if (m) {
+      const cada = m[2] ? +m[2] : null;
+      (porTipo[m[1]] ||= []).push({ cada, texto });
+    } else if (nombre === "parametros.csv") {
+      porTipo.parametros = texto;
+    } else if (nombre === "resumen.csv") {
+      porTipo.resumen = texto;
+    }
+  }
+
+  // Si hay varios archivos del mismo tipo, se usa el de menor cadencia.
+  const elegir = (lista) => lista && lista.sort((a, b) => (a.cada ?? 0) - (b.cada ?? 0))[0];
+
+  estado.params = leerParametros(porTipo.parametros, porTipo.resumen);
+  estado.serie = elegir(porTipo.serie) ? leerSerie(elegir(porTipo.serie).texto) : null;
+  estado.correlaciones = elegir(porTipo.correlaciones) ? leerCorrelaciones(elegir(porTipo.correlaciones).texto) : null;
+  estado.clusters = {};
+  if (porTipo.clusters_geometricos) estado.clusters.geo = leerClusters(elegir(porTipo.clusters_geometricos).texto);
+  if (porTipo.clusters_fk) estado.clusters.fk = leerClusters(elegir(porTipo.clusters_fk).texto);
+
+  if (!estado.serie && !estado.correlaciones && !estado.clusters.geo && !estado.clusters.fk) {
+    alert("No se encontraron archivos de salida reconocibles (serie.csv, correlaciones.csv, clusters_*.csv).");
+    return;
+  }
+
+  // N: de parámetros, o de la suma de tamaños de clusters (que cubre todo el sistema).
+  estado.N = estado.params?.N ?? null;
+  const algunCluster = estado.clusters.geo || estado.clusters.fk;
+  if (!estado.N && algunCluster && algunCluster.snapshots.length) {
+    estado.N = d3.sum(algunCluster.snapshots[0].tamanios);
+  }
+
+  const metricas = estado.serie ? Object.keys(estado.serie.metricas) : [];
+  estado.metrica = metricas.includes("M") ? "M" : metricas[0] ?? null;
+  estado.ventana = rangoCompleto();
+
+  const sel = document.getElementById("sel-metrica");
+  sel.replaceChildren(...metricas.map((k) => {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = nombreMetrica(k);
+    return o;
+  }));
+  sel.value = estado.metrica ?? "";
+
+  document.getElementById("vacio").hidden = true;
+  document.getElementById("reporte").hidden = false;
+  document.getElementById("boton-pdf").disabled = false;
+
+  recalcular();
+  renderTodo();
+}
+
+function leerParametros(texto, resumen) {
+  if (texto) {
+    const fila = d3.csvParse(texto)[0];
+    if (fila) {
+      return {
+        N: +fila.N, J: +fila.J, H: +fila.H, T: +fila.T,
+        dinamica: fila.dinamica, burn_in: +fila.burn_in, mediciones: +fila.mediciones,
+      };
+    }
+  }
+  // Formato antiguo de atlas: resumen.csv con L,J,B,T,seed,...
+  if (resumen && resumen.startsWith("L,")) {
+    const f = d3.csvParse(resumen)[0];
+    return { N: +f.L * +f.L, L: +f.L, J: +f.J, H: +f.B, T: +f.T, seed: f.seed };
+  }
+  return null;
+}
+
+function leerSerie(texto) {
+  const filas = d3.csvParse(texto);
+  const columnas = filas.columns.filter((c) => c !== "sweep");
+  const n = filas.length;
+  const sweeps = new Float64Array(n);
+  const metricas = Object.fromEntries(columnas.map((c) => [c, new Float64Array(n)]));
+  filas.forEach((f, i) => {
+    sweeps[i] = +f.sweep;
+    for (const c of columnas) metricas[c][i] = +f[c];
+  });
+  const cada = n > 1 ? sweeps[1] - sweeps[0] : 1;
+  return { cada, sweeps, metricas };
+}
+
+function leerCorrelaciones(texto) {
+  return d3.csvParse(texto, (f) => ({ r: +f.r, pares: +f.pares, C: +f.C, Cc: +f.Cc }));
+}
+
+function leerClusters(texto) {
+  const filas = d3.csvParse(texto);
+  const conSweep = filas.columns.includes("sweep");
+  const porSnapshot = new Map();
+  for (const f of filas) {
+    const s = +f.snapshot;
+    let snap = porSnapshot.get(s);
+    if (!snap) {
+      snap = { sweep: conSweep ? +f.sweep : null, tamanios: [] };
+      porSnapshot.set(s, snap);
+    }
+    snap.tamanios.push(+f.tamanio);
+  }
+  const snapshots = [...porSnapshot.entries()].sort((a, b) => a[0] - b[0]).map(([, s]) => {
+    s.tamanios.sort((a, b) => b - a);
+    return s;
+  });
+  const cada = conSweep && snapshots.length > 1 ? snapshots[1].sweep - snapshots[0].sweep : null;
+  return { cada, conSweep, snapshots };
+}
+
+async function leerListaArchivos(lista) {
+  const archivos = {};
+  for (const f of lista) {
+    if (f.name.endsWith(".csv")) archivos[f.webkitRelativePath || f.name] = await f.text();
+  }
+  cargar(archivos);
+}
+
+// Arrastrar carpetas o archivos.
+async function leerEntradas(items) {
+  const archivos = {};
+  async function recorrer(entrada) {
+    if (entrada.isFile) {
+      if (!entrada.name.endsWith(".csv")) return;
+      const f = await new Promise((ok, mal) => entrada.file(ok, mal));
+      archivos[entrada.name] = await f.text();
+    } else if (entrada.isDirectory) {
+      const lector = entrada.createReader();
+      let lote;
+      do {
+        lote = await new Promise((ok, mal) => lector.readEntries(ok, mal));
+        for (const e of lote) await recorrer(e);
+      } while (lote.length);
+    }
+  }
+  const entradas = [...items].map((it) => it.webkitGetAsEntry && it.webkitGetAsEntry()).filter(Boolean);
+  for (const e of entradas) await recorrer(e);
+  cargar(archivos);
+}
+
+// ============================================================
+// ESTADÍSTICA
+// ============================================================
+
+function rangoCompleto() {
+  const xs = [];
+  if (estado.serie) xs.push(estado.serie.sweeps[0], estado.serie.sweeps[estado.serie.sweeps.length - 1]);
+  for (const c of Object.values(estado.clusters)) {
+    if (c.conSweep && c.snapshots.length) xs.push(c.snapshots[0].sweep, c.snapshots[c.snapshots.length - 1].sweep);
+  }
+  return xs.length ? d3.extent(xs) : null;
+}
+
+function indicesVentana() {
+  const s = estado.serie.sweeps;
+  const [a, b] = estado.ventana;
+  return [d3.bisectLeft(s, a), d3.bisectRight(s, b)];
+}
+
+function snapshotsVentana(clave) {
+  const c = estado.clusters[clave];
+  if (!c) return [];
+  if (!c.conSweep || !estado.ventana) return c.snapshots;
+  const [a, b] = estado.ventana;
+  return c.snapshots.filter((s) => s.sweep >= a && s.sweep <= b);
+}
+
+// FFT radix-2 in situ.
+function fft(re, im, inversa) {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      [re[i], re[j]] = [re[j], re[i]];
+      [im[i], im[j]] = [im[j], im[i]];
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = (2 * Math.PI / len) * (inversa ? 1 : -1);
+    const wr = Math.cos(ang), wi = Math.sin(ang);
+    const mitad = len >> 1;
+    for (let i = 0; i < n; i += len) {
+      let cr = 1, ci = 0;
+      for (let k = 0; k < mitad; k++) {
+        const a = i + k, b = a + mitad;
+        const tr = re[b] * cr - im[b] * ci;
+        const ti = re[b] * ci + im[b] * cr;
+        re[b] = re[a] - tr; im[b] = im[a] - ti;
+        re[a] += tr; im[a] += ti;
+        const t = cr * wr - ci * wi;
+        ci = cr * wi + ci * wr;
+        cr = t;
+      }
+    }
+  }
+}
+
+// rho(t) con la misma normalización que simulaciones::autocorrelacion_integrada:
+// rho(t) = [sum_i (x_i - m)(x_{i+t} - m) / (n - t)] / var,   var = sum (x - m)^2 / n
+function autocorrelacion(x) {
+  const n = x.length;
+  if (n < 2) return new Float64Array([1]);
+  const media = d3.mean(x);
+  let m = 1;
+  while (m < 2 * n) m <<= 1;
+  const re = new Float64Array(m), im = new Float64Array(m);
+  for (let i = 0; i < n; i++) re[i] = x[i] - media;
+  fft(re, im, false);
+  for (let k = 0; k < m; k++) { re[k] = re[k] * re[k] + im[k] * im[k]; im[k] = 0; }
+  fft(re, im, true);
+  const varianza = re[0] / m / n;
+  const rho = new Float64Array(Math.floor(n / 2));
+  for (let t = 0; t < rho.length; t++) rho[t] = varianza > 0 ? (re[t] / m) / (n - t) / varianza : 0;
+  return rho;
+}
+
+function tauIntegrado(rho) {
+  let tau = 0.5;
+  for (let t = 1; t < rho.length; t++) {
+    if (rho[t] <= 0) break;
+    tau += rho[t];
+  }
+  return tau;
+}
+
+function estadistica(x) {
+  const n = x.length;
+  if (!n) return null;
+  let s = 0, s2 = 0, s4 = 0;
+  for (const v of x) { s += v; s2 += v * v; s4 += v * v * v * v; }
+  const media = s / n, media2 = s2 / n, media4 = s4 / n;
+  const varianza = media2 - media * media;
+  const rho = autocorrelacion(x);
+  const tau = varianza > 0 ? tauIntegrado(rho) : 0.5;
+  return {
+    n, media, media2, media4, varianza, tau, rho,
+    error: Math.sqrt(2 * tau * Math.max(varianza, 0) / n),
+    nEf: n / (2 * tau),
+  };
+}
+
+function recalcular() {
+  const cache = { metricas: {}, clusters: {} };
+
+  if (estado.serie) {
+    const [i0, i1] = indicesVentana();
+    for (const [k, v] of Object.entries(estado.serie.metricas)) {
+      const x = v.subarray(i0, i1);
+      cache.metricas[k] = { x, sweeps: estado.serie.sweeps.subarray(i0, i1), est: estadistica(x) };
+    }
+  }
+
+  for (const { clave } of SERIES_CLUSTERS) {
+    const snaps = snapshotsVentana(clave);
+    if (!estado.clusters[clave]) continue;
+    const numero = Float64Array.from(snaps, (s) => s.tamanios.length);
+    const mayor = Float64Array.from(snaps, (s) => (s.tamanios[0] ?? 0) / (estado.N || 1));
+    cache.clusters[clave] = {
+      snaps,
+      numero, mayor,
+      estNumero: estadistica(numero),
+      estMayor: estadistica(mayor),
+    };
+  }
+
+  estado.cache = cache;
+}
+
+// Distribución de tamaños con bins logarítmicos: n(s) por sitio y por snapshot.
+function distribucionLog(snaps, excluirMayor) {
+  if (!snaps.length) return [];
+  let maximo = 1;
+  for (const s of snaps) maximo = Math.max(maximo, s.tamanios[0] ?? 1);
+  const factor = 1.35;
+  const bordes = [1];
+  while (bordes[bordes.length - 1] <= maximo) {
+    const sig = Math.max(bordes[bordes.length - 1] + 1, Math.ceil(bordes[bordes.length - 1] * factor));
+    bordes.push(sig);
+  }
+  const cuentas = new Float64Array(bordes.length - 1);
+  for (const s of snaps) {
+    for (let i = excluirMayor ? 1 : 0; i < s.tamanios.length; i++) {
+      const t = s.tamanios[i];
+      const b = d3.bisectRight(bordes, t) - 1;
+      if (b >= 0 && b < cuentas.length) cuentas[b] += 1;
+    }
+  }
+  const N = estado.N || 1;
+  const puntos = [];
+  for (let b = 0; b < cuentas.length; b++) {
+    if (cuentas[b] === 0) continue;
+    const ancho = bordes[b + 1] - bordes[b];
+    const centro = Math.sqrt(bordes[b] * (bordes[b + 1] - 1));
+    puntos.push({ s: centro, n: cuentas[b] / ancho / snaps.length / N, cuenta: cuentas[b], desde: bordes[b], hasta: bordes[b + 1] - 1 });
+  }
+  return puntos;
+}
+
+// ============================================================
+// UTILIDADES DE GRÁFICAS
+// ============================================================
+
+const tooltip = document.getElementById("tooltip");
+
+function mostrarTooltip(evento, cabecera, filas) {
+  tooltip.replaceChildren();
+  const cab = document.createElement("div");
+  cab.className = "cab";
+  cab.textContent = cabecera;
+  tooltip.append(cab);
+  for (const f of filas) {
+    const d = document.createElement("div");
+    d.className = "fila";
+    if (f.color) {
+      const i = document.createElement("i");
+      i.style.borderColor = f.color;
+      d.append(i);
+    }
+    const b = document.createElement("b");
+    b.textContent = f.valor;
+    const s = document.createElement("span");
+    s.textContent = f.nombre;
+    d.append(b, s);
+    tooltip.append(d);
+  }
+  const ancho = tooltip.offsetWidth, alto = tooltip.offsetHeight;
+  let x = evento.clientX + 14, y = evento.clientY + 14;
+  if (x + ancho > window.innerWidth - 8) x = evento.clientX - ancho - 14;
+  if (y + alto > window.innerHeight - 8) y = evento.clientY - alto - 14;
+  tooltip.style.left = x + "px";
+  tooltip.style.top = y + "px";
+  tooltip.style.opacity = 1;
+}
+const ocultarTooltip = () => { tooltip.style.opacity = 0; };
+
+function leyenda(id, elementos) {
+  const cont = document.getElementById(id);
+  if (!cont) return;
+  cont.replaceChildren(...elementos.map((e) => {
+    const s = document.createElement("span");
+    const i = document.createElement("i");
+    if (e.ref) i.className = "ref"; else i.style.borderColor = e.color;
+    s.append(i, document.createTextNode(e.nombre));
+    return s;
+  }));
+}
+
+const impresion = () => document.body.classList.contains("impresion");
+
+function lienzo(id, altoPantalla, altoImpresion) {
+  const cont = document.getElementById(id);
+  const ancho = Math.max(cont.clientWidth, 200);
+  const alto = impresion() ? altoImpresion : altoPantalla;
+  const margen = impresion()
+    ? { arriba: 14, derecha: 10, abajo: 26, izquierda: 42 }
+    : { arriba: 20, derecha: 14, abajo: 34, izquierda: 54 };
+  d3.select(cont).selectAll("*").remove();
+  const svg = d3.select(cont).append("svg")
+    .attr("viewBox", `0 0 ${ancho} ${alto}`)
+    .attr("role", "img");
+  const w = ancho - margen.izquierda - margen.derecha;
+  const h = alto - margen.arriba - margen.abajo;
+  const g = svg.append("g").attr("transform", `translate(${margen.izquierda},${margen.arriba})`);
+  return { svg, g, w, h, margen };
+}
+
+function ejes(g, x, y, w, h, opciones = {}) {
+  const nx = Math.max(2, Math.floor(w / 90));
+  const ny = Math.max(2, Math.floor(h / 40));
+  const ejeX = d3.axisBottom(x).tickSizeOuter(0).tickSize(-h).tickPadding(6);
+  const ejeY = d3.axisLeft(y).tickSizeOuter(0).tickSize(-w).tickPadding(6);
+  if (opciones.logX) ejeX.tickFormat(formatoLog(x)); else ejeX.ticks(nx).tickFormat(opciones.fmtX || d3.format("~s"));
+  if (opciones.logY) ejeY.tickFormat(formatoLog(y)); else ejeY.ticks(ny).tickFormat(opciones.fmtY || d3.format("~g"));
+
+  const gx = g.append("g").attr("transform", `translate(0,${h})`).call(ejeX);
+  const gy = g.append("g").call(ejeY);
+  for (const e of [gx, gy]) {
+    e.select(".domain").attr("class", "dominio");
+  }
+  // Rejilla logarítmica: solo potencias de 10 para no saturar.
+  if (opciones.logX) gx.selectAll(".tick").filter((d) => !esPotencia10(d)).select("line").remove();
+  if (opciones.logY) gy.selectAll(".tick").filter((d) => !esPotencia10(d)).select("line").remove();
+
+  if (opciones.tituloX) {
+    g.append("text").attr("class", "titulo-eje")
+      .attr("x", w).attr("y", h + (impresion() ? 22 : 29)).attr("text-anchor", "end")
+      .text(opciones.tituloX);
+  }
+  if (opciones.tituloY) {
+    g.append("text").attr("class", "titulo-eje")
+      .attr("x", 0).attr("y", impresion() ? -5 : -8)
+      .text(opciones.tituloY);
+  }
+}
+// En ejes log que cubren varias décadas solo se etiquetan las potencias de 10
+// (como 10⁻³); si cubren menos de dos, se etiquetan todos los ticks.
+const SUPER = { "-": "⁻", 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹" };
+function formatoLog(escala) {
+  const [a, b] = escala.domain().map(Math.log10);
+  const decadas = Math.floor(Math.max(a, b)) - Math.ceil(Math.min(a, b)) + 1;
+  if (decadas < 2) return d3.format("~g");
+  return (v) => {
+    if (!esPotencia10(v)) return "";
+    const k = Math.round(Math.log10(v));
+    if (k >= 0 && k <= 3) return String(10 ** k);
+    return "10" + String(k).split("").map((c) => SUPER[c]).join("");
+  };
+}
+const esPotencia10 = (v) => Math.abs(Math.log10(v) - Math.round(Math.log10(v))) < 1e-9;
+
+// Reduce una serie larga a min/max por columna de píxel, conservando la forma.
+function diezmar(xs, ys, columnas) {
+  const n = xs.length;
+  if (n <= columnas * 2) return Array.from(xs, (x, i) => [x, ys[i]]);
+  const puntos = [];
+  const paso = n / columnas;
+  for (let c = 0; c < columnas; c++) {
+    const a = Math.floor(c * paso), b = Math.min(n, Math.floor((c + 1) * paso));
+    let iMin = a, iMax = a;
+    for (let i = a; i < b; i++) {
+      if (ys[i] < ys[iMin]) iMin = i;
+      if (ys[i] > ys[iMax]) iMax = i;
+    }
+    const [p, q] = iMin < iMax ? [iMin, iMax] : [iMax, iMin];
+    puntos.push([xs[p], ys[p]]);
+    if (q !== p) puntos.push([xs[q], ys[q]]);
+  }
+  return puntos;
+}
+
+// Capa de hover con cursor vertical que se ajusta al x más cercano.
+function capaCursor(g, w, h, x, xs, alMover) {
+  const cursor = g.append("line").attr("class", "cursor").attr("y1", 0).attr("y2", h).style("opacity", 0);
+  const puntos = g.append("g");
+  g.append("rect").attr("width", w).attr("height", h).attr("fill", "transparent")
+    .on("pointermove", (ev) => {
+      const [px] = d3.pointer(ev);
+      const x0 = x.invert(px);
+      let i = d3.bisectCenter(xs, x0);
+      i = Math.max(0, Math.min(xs.length - 1, i));
+      cursor.attr("x1", x(xs[i])).attr("x2", x(xs[i])).style("opacity", 1);
+      puntos.selectAll("*").remove();
+      alMover(ev, i, puntos);
+    })
+    .on("pointerleave", () => {
+      cursor.style("opacity", 0);
+      puntos.selectAll("*").remove();
+      ocultarTooltip();
+    });
+  return { cursor, puntos };
+}
+
+function punto(capa, x, y, color) {
+  capa.append("circle").attr("class", "punto").attr("cx", x).attr("cy", y).attr("r", 4).style("fill", color);
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+
+function renderTodo() {
+  if (!estado.cache) return;
+  ocultarTooltip();
+  renderEncabezado();
+  renderTabla();
+  if (!impresion()) renderVentana();
+  renderSeries();
+  renderHistograma();
+  renderAutocorrelacion();
+  renderCorrelaciones();
+  renderDistribucion();
+  renderSerieClusters("mayor", "g-mayor", "ley-mayor", "sub-mayor", "t-mayor",
+    (v) => fmtCorto(v), "s_max / N");
+  renderSerieClusters("numero", "g-numero", "ley-numero", "sub-numero", "t-numero",
+    (v) => fmtEntero(Math.round(v)), "clusters");
+  document.getElementById("pagina-2").hidden =
+    !estado.correlaciones && !estado.clusters.geo && !estado.clusters.fk;
+}
+
+function renderEncabezado() {
+  const p = estado.params;
+  const campos = [];
+  if (p) {
+    if (p.L) campos.push(["L", p.L]);
+    campos.push(["N", fmtEntero(p.N)], ["J", p.J], ["H", p.H], ["T", p.T]);
+    if (p.dinamica) campos.push(["Dinámica", p.dinamica]);
+    if (p.burn_in != null && !isNaN(p.burn_in)) campos.push(["Burn-in", fmtEntero(p.burn_in)]);
+    if (p.mediciones != null && !isNaN(p.mediciones)) campos.push(["Mediciones", fmtEntero(p.mediciones)]);
+    if (p.seed) campos.push(["Semilla", p.seed]);
+  } else if (estado.N) {
+    campos.push(["N", fmtEntero(estado.N)]);
+  }
+  for (const id of ["parametros", "parametros-2"]) {
+    document.getElementById(id).replaceChildren(...campos.map(([k, v]) => {
+      const s = document.createElement("span");
+      const b = document.createElement("b");
+      b.textContent = v;
+      s.append(document.createTextNode(k + " = "), b);
+      return s;
+    }));
+  }
+
+  const nota = document.getElementById("nota-ventana");
+  const completo = rangoCompleto();
+  if (estado.ventana && completo) {
+    const total = estado.ventana[0] === completo[0] && estado.ventana[1] === completo[1];
+    nota.textContent = `Ventana de análisis: sweeps ${fmtEntero(estado.ventana[0])}–${fmtEntero(estado.ventana[1])}` +
+      (total ? " (serie completa)" : ` de ${fmtEntero(completo[0])}–${fmtEntero(completo[1])}`);
+  } else {
+    nota.textContent = "";
+  }
+  document.getElementById("ventana-desde").value = estado.ventana ? estado.ventana[0] : "";
+  document.getElementById("ventana-hasta").value = estado.ventana ? estado.ventana[1] : "";
+}
+
+function renderTabla() {
+  const tabla = document.getElementById("tabla");
+  const filas = [];
+  const cadaSerie = estado.serie?.cada ?? 1;
+  for (const [k, { est }] of Object.entries(estado.cache.metricas)) {
+    if (est) filas.push([nombreMetrica(k), est, cadaSerie]);
+  }
+  for (const { clave, nombre } of SERIES_CLUSTERS) {
+    const c = estado.cache.clusters[clave];
+    const cada = estado.clusters[clave]?.cada ?? null;
+    if (c?.estNumero) filas.push([`Clusters ${nombre}: número`, c.estNumero, cada]);
+    if (c?.estMayor) filas.push([`Clusters ${nombre}: s_max / N`, c.estMayor, cada]);
+  }
+
+  const cab = ["Observable", "n", "Media", "± error", "Varianza", "τ_int (sweeps)", "n_ef"];
+  const thead = document.createElement("thead");
+  const trh = document.createElement("tr");
+  for (const c of cab) { const th = document.createElement("th"); th.textContent = c; trh.append(th); }
+  thead.append(trh);
+  const tbody = document.createElement("tbody");
+  for (const [nombre, e, cada] of filas) {
+    const tr = document.createElement("tr");
+    const celdas = [
+      nombre, fmtEntero(e.n), fmt(e.media), fmtCorto(e.error), fmtCorto(e.varianza),
+      cada == null ? `${fmtCorto(e.tau)} snapshots` : fmtCorto(e.tau * cada), fmtEntero(Math.round(e.nEf)),
+    ];
+    celdas.forEach((v, i) => {
+      const td = document.createElement("td");
+      td.textContent = v;
+      if (i === 3) td.className = "pm";
+      tr.append(td);
+    });
+    tbody.append(tr);
+  }
+  tabla.replaceChildren(thead, tbody);
+
+  // Cantidades derivadas de las fluctuaciones.
+  const derivados = [];
+  const N = estado.N, T = estado.params?.T;
+  const m = estado.cache.metricas.M?.est;
+  const absM = estado.cache.metricas.abs_M?.est;
+  const e = estado.cache.metricas.E?.est;
+  if (m && m.media2 > 0) derivados.push(["Cumulante de Binder U₄ = 1 − ⟨m⁴⟩/3⟨m²⟩²", 1 - m.media4 / (3 * m.media2 * m.media2)]);
+  if (N && T) {
+    if (absM) derivados.push(["χ = N(⟨m²⟩ − ⟨|m|⟩²)/T", N * absM.varianza / T]);
+    else if (m) derivados.push(["χ = N(⟨m²⟩ − ⟨m⟩²)/T", N * m.varianza / T]);
+    if (e) derivados.push(["C_v = N var(e)/T²", N * e.varianza / (T * T)]);
+  }
+  document.getElementById("derivados").replaceChildren(...derivados.map(([k, v]) => {
+    const s = document.createElement("span");
+    const b = document.createElement("b");
+    b.textContent = fmt(v);
+    s.append(document.createTextNode(k + " = "), b);
+    return s;
+  }));
+}
+
+function renderVentana() {
+  const cont = document.getElementById("g-ventana");
+  if (!estado.serie || !estado.metrica) { cont.closest(".tarjeta").hidden = true; return; }
+  cont.closest(".tarjeta").hidden = false;
+  const { g, w, h } = lienzo("g-ventana", 110, 110);
+  const xs = estado.serie.sweeps, ys = estado.serie.metricas[estado.metrica];
+  const x = d3.scaleLinear().domain(rangoCompleto()).range([0, w]);
+  const y = d3.scaleLinear().domain(d3.extent(ys)).nice().range([h, 0]);
+  ejes(g, x, y, w, h, { tituloX: "sweep" });
+  g.append("path").attr("class", "linea").style("stroke", "var(--serie-1)").style("stroke-width", 1)
+    .attr("d", d3.line()(diezmar(xs, ys, Math.ceil(w)).map(([a, b]) => [x(a), y(b)])));
+
+  const brush = d3.brushX().extent([[0, 0], [w, h]])
+    .on("end", (ev) => {
+      if (!ev.sourceEvent) return;
+      if (!ev.selection) return;
+      const [a, b] = ev.selection.map(x.invert);
+      fijarVentana([Math.round(a), Math.round(b)]);
+    });
+  const gb = g.append("g").call(brush);
+  gb.select(".selection").style("fill", "var(--serie-1-lavado)").style("stroke", "var(--serie-1)");
+  const completo = rangoCompleto();
+  if (estado.ventana[0] !== completo[0] || estado.ventana[1] !== completo[1]) {
+    gb.call(brush.move, estado.ventana.map(x));
+  }
+  gb.on("dblclick", () => fijarVentana(rangoCompleto()));
+}
+
+function fijarVentana(v) {
+  const completo = rangoCompleto();
+  let [a, b] = v;
+  a = Math.max(completo[0], Math.min(a, completo[1]));
+  b = Math.max(completo[0], Math.min(b, completo[1]));
+  if (b <= a) return;
+  estado.ventana = [a, b];
+  recalcular();
+  renderTodo();
+}
+
+function renderSeries() {
+  const cont = document.getElementById("series");
+  cont.replaceChildren();
+  if (!estado.serie) return;
+  const claves = Object.keys(estado.cache.metricas);
+  const graficas = [];
+
+  for (const [i, k] of claves.entries()) {
+    const tarjeta = document.createElement("div");
+    tarjeta.className = "tarjeta";
+    const h3 = document.createElement("h3");
+    h3.textContent = nombreMetrica(k);
+    const sub = document.createElement("p");
+    sub.className = "sub";
+    const est = estado.cache.metricas[k].est;
+    sub.textContent = est ? `⟨${k}⟩ = ${fmt(est.media)} ± ${fmtCorto(est.error)}` : "";
+    const div = document.createElement("div");
+    div.className = "grafica";
+    div.id = "g-serie-" + i;
+    tarjeta.append(h3, sub, div);
+    cont.append(tarjeta);
+  }
+
+  for (const [i, k] of claves.entries()) {
+    const { x: ys, sweeps: xs, est } = estado.cache.metricas[k];
+    const { g, w, h } = lienzo("g-serie-" + i, 170, 112);
+    const x = d3.scaleLinear().domain(estado.ventana).range([0, w]);
+    const y = d3.scaleLinear().domain(d3.extent(ys)).nice().range([h, 0]);
+    ejes(g, x, y, w, h, { tituloX: "sweep" });
+    if (est) {
+      g.append("line").attr("class", "ref").attr("x1", 0).attr("x2", w)
+        .attr("y1", y(est.media)).attr("y2", y(est.media));
+    }
+    g.append("path").attr("class", "linea").style("stroke", "var(--serie-1)")
+      .style("stroke-width", xs.length > w ? 1 : 2)
+      .attr("d", d3.line()(diezmar(xs, ys, Math.ceil(w)).map(([a, b]) => [x(a), y(b)])));
+    graficas.push({ k, g, x, y, xs, ys, w, h });
+  }
+
+  // Cursor compartido entre los múltiplos pequeños.
+  for (const gr of graficas) {
+    const capas = graficas.map((o) => {
+      const linea = o.g.append("line").attr("class", "cursor").attr("y1", 0).attr("y2", o.h).style("opacity", 0);
+      const pts = o.g.append("g");
+      return { o, linea, pts };
+    });
+    gr.capas = capas;
+  }
+  for (const gr of graficas) {
+    gr.g.append("rect").attr("width", gr.w).attr("height", gr.h).attr("fill", "transparent")
+      .on("pointermove", (ev) => {
+        const [px] = d3.pointer(ev);
+        const i = Math.max(0, Math.min(gr.xs.length - 1, d3.bisectCenter(gr.xs, gr.x.invert(px))));
+        const filas = [];
+        for (const { o, linea, pts } of gr.capas) {
+          linea.attr("x1", o.x(o.xs[i])).attr("x2", o.x(o.xs[i])).style("opacity", 1);
+          pts.selectAll("*").remove();
+          punto(pts, o.x(o.xs[i]), o.y(o.ys[i]), "var(--serie-1)");
+          filas.push({ valor: fmt(o.ys[i]), nombre: o.k });
+        }
+        mostrarTooltip(ev, `sweep ${fmtEntero(gr.xs[i])}`, filas);
+      })
+      .on("pointerleave", () => {
+        for (const { linea, pts } of gr.capas) { linea.style("opacity", 0); pts.selectAll("*").remove(); }
+        ocultarTooltip();
+      });
+  }
+}
+
+function renderHistograma() {
+  const tarjeta = document.getElementById("g-hist").closest(".tarjeta");
+  const datos = estado.cache.metricas[estado.metrica];
+  if (!datos || !datos.x.length) { tarjeta.hidden = true; return; }
+  tarjeta.hidden = false;
+  document.getElementById("titulo-hist").textContent = `Histograma de ${nombreMetrica(estado.metrica)}`;
+  document.getElementById("sub-hist").textContent =
+    `${fmtEntero(datos.x.length)} mediciones, ${estado.bins} bins, densidad normalizada`;
+
+  const { g, w, h } = lienzo("g-hist", 230, 150);
+  const x = d3.scaleLinear().domain(d3.extent(datos.x)).nice().range([0, w]);
+  const bins = d3.bin().domain(x.domain()).thresholds(x.ticks(estado.bins))(datos.x);
+  const total = datos.x.length;
+  const densidad = (b) => b.length / total / ((b.x1 - b.x0) || 1);
+  const y = d3.scaleLinear().domain([0, d3.max(bins, densidad) || 1]).nice().range([h, 0]);
+  ejes(g, x, y, w, h, { tituloX: estado.metrica, fmtX: d3.format("~g"), tituloY: "densidad" });
+
+  const hueco = 2;
+  g.append("g").selectAll("path").data(bins).join("path")
+    .style("fill", "var(--serie-1)")
+    .attr("d", (b) => {
+      const x0 = x(b.x0) + hueco / 2, x1 = x(b.x1) - hueco / 2;
+      const ancho = Math.max(0.5, x1 - x0);
+      const y0 = y(densidad(b));
+      const r = Math.min(4, ancho / 2, h - y0);
+      return `M${x0},${h}V${y0 + r}Q${x0},${y0} ${x0 + r},${y0}H${x0 + ancho - r}Q${x0 + ancho},${y0} ${x0 + ancho},${y0 + r}V${h}Z`;
+    })
+    .on("pointermove", function (ev, b) {
+      d3.select(this).style("opacity", 0.75);
+      mostrarTooltip(ev, `${fmt(b.x0)} – ${fmt(b.x1)}`, [
+        { valor: fmtEntero(b.length), nombre: "mediciones", color: "var(--serie-1)" },
+        { valor: fmtCorto(densidad(b)), nombre: "densidad" },
+      ]);
+    })
+    .on("pointerleave", function () { d3.select(this).style("opacity", 1); ocultarTooltip(); });
+
+  const est = datos.est;
+  g.append("line").attr("class", "ref").attr("x1", x(est.media)).attr("x2", x(est.media)).attr("y1", 0).attr("y2", h);
+  g.append("text").attr("class", "etiqueta-ref").attr("x", x(est.media) + 4).attr("y", 10).text("media");
+}
+
+function renderAutocorrelacion() {
+  const tarjeta = document.getElementById("g-acf").closest(".tarjeta");
+  const datos = estado.cache.metricas[estado.metrica];
+  if (!datos || !datos.est || datos.x.length < 4) { tarjeta.hidden = true; return; }
+  tarjeta.hidden = false;
+  const { rho, tau } = datos.est;
+  const cada = estado.serie.cada;
+  document.getElementById("titulo-acf").textContent = `Autocorrelación de ${nombreMetrica(estado.metrica)}`;
+  document.getElementById("sub-acf").textContent =
+    `τ_int = ${fmtCorto(tau * cada)} sweeps (${fmtCorto(tau)} mediciones)`;
+
+  const lagMax = Math.min(rho.length - 1, Math.max(20, Math.ceil(6 * tau)));
+  const lags = d3.range(0, lagMax + 1);
+  const xs = lags.map((t) => t * cada);
+  const { g, w, h } = lienzo("g-acf", 230, 150);
+  const x = d3.scaleLinear().domain([0, xs[xs.length - 1]]).range([0, w]);
+  const y = d3.scaleLinear().domain([Math.min(0, d3.min(lags, (t) => rho[t])), 1]).nice().range([h, 0]);
+  ejes(g, x, y, w, h, { tituloX: "retraso (sweeps)", tituloY: "ρ(t)" });
+
+  const elementos = [{ nombre: "ρ(t)", color: "var(--serie-1)" }];
+  if (estado.referencias) {
+    elementos.push({ nombre: "exp(−t/τ_int)", ref: true });
+    g.append("path").attr("class", "ref")
+      .attr("d", d3.line()(lags.map((t) => [x(t * cada), y(Math.exp(-t / tau))])));
+  }
+  leyenda("ley-acf", elementos);
+  g.append("line").attr("class", "ref").attr("x1", x(tau * cada)).attr("x2", x(tau * cada)).attr("y1", 0).attr("y2", h);
+  g.append("text").attr("class", "etiqueta-ref").attr("x", x(tau * cada) + 4).attr("y", 10).text("τ_int");
+  g.append("path").attr("class", "linea").style("stroke", "var(--serie-1)")
+    .attr("d", d3.line()(lags.map((t) => [x(t * cada), y(rho[t])])));
+
+  capaCursor(g, w, h, x, xs, (ev, i, capa) => {
+    punto(capa, x(xs[i]), y(rho[i]), "var(--serie-1)");
+    mostrarTooltip(ev, `retraso ${fmtEntero(xs[i])} sweeps`, [{ valor: fmtCorto(rho[i]), nombre: "ρ(t)", color: "var(--serie-1)" }]);
+  });
+}
+
+function renderCorrelaciones() {
+  const tarjeta = document.getElementById("t-corr");
+  const datos = estado.correlaciones;
+  if (!datos || !datos.length) { tarjeta.hidden = true; return; }
+  tarjeta.hidden = false;
+  const log = estado.escalaCorr === "log";
+  document.getElementById("sub-corr").textContent =
+    "r: distancia en la red (capas de vecinos). Promedio sobre todos los snapshots" +
+    (log ? "; solo valores positivos en log-log." : ".");
+
+  const series = [
+    { clave: "C", nombre: "C(r)", color: "var(--serie-1)" },
+    { clave: "Cc", nombre: "Cc(r) = C(r) − ⟨m⟩²", color: "var(--serie-2)" },
+  ];
+  const { g, w, h } = lienzo("g-corr", 260, 190);
+  const rs = datos.map((d) => d.r);
+  const valores = datos.flatMap((d) => [d.C, d.Cc]).filter((v) => !log || v > 0);
+  const x = (log ? d3.scaleLog() : d3.scaleLinear()).domain(d3.extent(rs)).range([0, w]);
+  if (!log) x.nice();
+  const y = log
+    ? d3.scaleLog().domain(d3.extent(valores)).nice().range([h, 0])
+    : d3.scaleLinear().domain([Math.min(0, d3.min(valores)), d3.max(valores)]).nice().range([h, 0]);
+  ejes(g, x, y, w, h, { logX: log, logY: log, tituloX: "r", fmtX: d3.format("~g") });
+
+  const elementos = series.map(({ nombre, color }) => ({ nombre, color }));
+  if (estado.referencias && log) {
+    const d0 = datos.find((d) => d.Cc > 0);
+    if (d0) {
+      const ref = rs.map((r) => [r, d0.Cc * Math.pow(r / d0.r, -0.25)]);
+      g.append("path").attr("class", "ref").attr("d", d3.line()(ref.map(([a, b]) => [x(a), y(b)])));
+      elementos.push({ nombre: "r^(−1/4) (η = 1/4, T_c)", ref: true });
+    }
+  }
+  leyenda("ley-corr", elementos);
+
+  for (const s of series) {
+    const pts = datos.filter((d) => !log || d[s.clave] > 0).map((d) => [x(d.r), y(d[s.clave])]);
+    g.append("path").attr("class", "linea").style("stroke", s.color).attr("d", d3.line()(pts));
+  }
+
+  capaCursor(g, w, h, x, rs, (ev, i, capa) => {
+    const d = datos[i];
+    const filas = [];
+    for (const s of series) {
+      if (!log || d[s.clave] > 0) punto(capa, x(d.r), y(d[s.clave]), s.color);
+      filas.push({ valor: fmt(d[s.clave]), nombre: s.clave, color: s.color });
+    }
+    filas.push({ valor: fmtEntero(d.pares), nombre: "pares por snapshot" });
+    mostrarTooltip(ev, `r = ${d.r}`, filas);
+  });
+}
+
+function renderDistribucion() {
+  const tarjeta = document.getElementById("t-dist");
+  const presentes = SERIES_CLUSTERS.filter((s) => estado.cache.clusters[s.clave]?.snaps.length);
+  if (!presentes.length) { tarjeta.hidden = true; return; }
+  tarjeta.hidden = false;
+  document.getElementById("sub-dist").textContent =
+    "Bins logarítmicos; clusters por sitio y por snapshot" +
+    (estado.excluirMayor ? ", sin el mayor cluster de cada snapshot." : ".");
+
+  const dists = presentes.map((s) => ({ ...s, puntos: distribucionLog(estado.cache.clusters[s.clave].snaps, estado.excluirMayor) }))
+    .filter((d) => d.puntos.length);
+  if (!dists.length) { tarjeta.hidden = true; return; }
+
+  const { g, w, h } = lienzo("g-dist", 260, 190);
+  const todos = dists.flatMap((d) => d.puntos);
+  const x = d3.scaleLog().domain(d3.extent(todos, (p) => p.s)).nice().range([0, w]);
+  const y = d3.scaleLog().domain(d3.extent(todos, (p) => p.n)).nice().range([h, 0]);
+  ejes(g, x, y, w, h, { logX: true, logY: true, tituloX: "s", tituloY: "n(s)" });
+
+  const elementos = dists.map(({ nombre, color }) => ({ nombre, color }));
+  if (estado.referencias) {
+    // Pendientes de Fisher, desplazadas por encima de los datos (×4) para que no
+    // queden tapadas. Ancladas al primer bin con s >= 2.
+    for (const d of dists) {
+      const ancla = d.puntos.find((p) => p.s >= 2) ?? d.puntos[0];
+      const [s0, s1] = x.domain();
+      const linea = d3.range(0, 41).map((k) => s0 * Math.pow(s1 / s0, k / 40))
+        .map((s) => [s, 4 * ancla.n * Math.pow(s / ancla.s, -d.tau)])
+        .filter(([, v]) => v >= y.domain()[0] && v <= y.domain()[1]);
+      g.append("path").attr("class", "ref").attr("d", d3.line()(linea.map(([a, b]) => [x(a), y(b)])));
+    }
+    elementos.push({ nombre: "s^(−τ), τ = " + dists.map((d) => `${d.tauTxt} (${d.nombre})`).join(", "), ref: true });
+  }
+  leyenda("ley-dist", elementos);
+
+  for (const d of dists) {
+    g.append("path").attr("class", "linea").style("stroke", d.color)
+      .attr("d", d3.line()(d.puntos.map((p) => [x(p.s), y(p.n)])));
+    g.append("g").selectAll("circle").data(d.puntos).join("circle")
+      .attr("class", "punto").attr("cx", (p) => x(p.s)).attr("cy", (p) => y(p.n)).attr("r", 3)
+      .style("fill", d.color);
+  }
+
+  // Hover: el punto más cercano de cualquier serie.
+  const candidatos = dists.flatMap((d) => d.puntos.map((p) => ({ ...p, d, px: x(p.s), py: y(p.n) })));
+  const resaltado = g.append("g");
+  g.append("rect").attr("width", w).attr("height", h).attr("fill", "transparent")
+    .on("pointermove", (ev) => {
+      const [mx, my] = d3.pointer(ev);
+      const c = d3.least(candidatos, (p) => (p.px - mx) ** 2 + (p.py - my) ** 2);
+      resaltado.selectAll("*").remove();
+      if (!c) return;
+      punto(resaltado, c.px, c.py, c.d.color);
+      mostrarTooltip(ev, `s = ${fmtEntero(c.desde)}${c.hasta > c.desde ? "–" + fmtEntero(c.hasta) : ""}`, [
+        { valor: fmtCorto(c.n), nombre: `n(s) ${c.d.nombre}`, color: c.d.color },
+        { valor: fmtEntero(c.cuenta), nombre: "clusters en el bin" },
+      ]);
+    })
+    .on("pointerleave", () => { resaltado.selectAll("*").remove(); ocultarTooltip(); });
+}
+
+function renderSerieClusters(campo, idGrafica, idLeyenda, idSub, idTarjeta, formato, tituloY) {
+  const tarjeta = document.getElementById(idTarjeta);
+  const presentes = SERIES_CLUSTERS.filter((s) => estado.cache.clusters[s.clave]?.snaps.length);
+  if (!presentes.length) { tarjeta.hidden = true; return; }
+  tarjeta.hidden = false;
+
+  const series = presentes.map((s) => {
+    const c = estado.cache.clusters[s.clave];
+    const xs = c.snaps.map((sn, i) => sn.sweep ?? i);
+    return { ...s, xs, ys: c[campo], est: campo === "mayor" ? c.estMayor : c.estNumero };
+  });
+  const usaSweep = series.every((s) => estado.clusters[s.clave].conSweep);
+  document.getElementById(idSub).textContent = series
+    .map((s) => `${s.nombre}: ${formato(s.est.media)} ± ${fmtCorto(s.est.error)}`).join(" · ");
+  leyenda(idLeyenda, series.map(({ nombre, color }) => ({ nombre, color })));
+
+  const { g, w, h } = lienzo(idGrafica, 200, 150);
+  const x = d3.scaleLinear().domain(d3.extent(series.flatMap((s) => s.xs))).range([0, w]);
+  const y = d3.scaleLinear().domain(d3.extent(series.flatMap((s) => [...s.ys]))).nice().range([h, 0]);
+  ejes(g, x, y, w, h, { tituloX: usaSweep ? "sweep" : "snapshot", tituloY: tituloY });
+  for (const s of series) {
+    g.append("path").attr("class", "linea").style("stroke", s.color)
+      .style("stroke-width", s.xs.length > w / 2 ? 1 : 2)
+      .attr("d", d3.line()(diezmar(s.xs, s.ys, Math.ceil(w)).map(([a, b]) => [x(a), y(b)])));
+  }
+  const xs = series[0].xs;
+  capaCursor(g, w, h, x, xs, (ev, i, capa) => {
+    const filas = [];
+    for (const s of series) {
+      if (i < s.ys.length) {
+        punto(capa, x(s.xs[i]), y(s.ys[i]), s.color);
+        filas.push({ valor: formato(s.ys[i]), nombre: s.nombre, color: s.color });
+      }
+    }
+    mostrarTooltip(ev, `${usaSweep ? "sweep" : "snapshot"} ${fmtEntero(xs[i])}`, filas);
+  });
+}
+
+// ============================================================
+// EVENTOS
+// ============================================================
+
+document.getElementById("entrada-carpeta").addEventListener("change", (e) => leerListaArchivos(e.target.files));
+document.getElementById("entrada-archivos").addEventListener("change", (e) => leerListaArchivos(e.target.files));
+
+const zona = document.getElementById("vacio");
+for (const ev of ["dragenter", "dragover"]) {
+  document.addEventListener(ev, (e) => { e.preventDefault(); zona.classList.add("arrastrando"); });
+}
+document.addEventListener("dragleave", (e) => { if (!e.relatedTarget) zona.classList.remove("arrastrando"); });
+document.addEventListener("drop", (e) => {
+  e.preventDefault();
+  zona.classList.remove("arrastrando");
+  if (e.dataTransfer.items?.length) leerEntradas(e.dataTransfer.items);
+  else leerListaArchivos(e.dataTransfer.files);
+});
+
+document.getElementById("sel-metrica").addEventListener("change", (e) => { estado.metrica = e.target.value; renderTodo(); });
+document.getElementById("sel-bins").addEventListener("change", (e) => {
+  estado.bins = Math.max(5, Math.min(200, +e.target.value || 40));
+  renderHistograma();
+});
+document.getElementById("sel-escala").addEventListener("change", (e) => { estado.escalaCorr = e.target.value; renderCorrelaciones(); });
+document.getElementById("sel-ref").addEventListener("change", (e) => { estado.referencias = e.target.checked; renderTodo(); });
+document.getElementById("sel-excluir").addEventListener("change", (e) => { estado.excluirMayor = e.target.checked; renderDistribucion(); });
+document.getElementById("ventana-aplicar").addEventListener("click", () => {
+  fijarVentana([+document.getElementById("ventana-desde").value, +document.getElementById("ventana-hasta").value]);
+});
+document.getElementById("ventana-todo").addEventListener("click", () => fijarVentana(rangoCompleto()));
+
+document.getElementById("boton-tema").addEventListener("click", () => {
+  const raiz = document.documentElement;
+  const oscuro = raiz.dataset.theme
+    ? raiz.dataset.theme === "dark"
+    : matchMedia("(prefers-color-scheme: dark)").matches;
+  raiz.dataset.theme = oscuro ? "light" : "dark";
+  try { localStorage.setItem("visor-ising-tema", raiz.dataset.theme); } catch (_) {}
+});
+try {
+  const t = localStorage.getItem("visor-ising-tema");
+  if (t) document.documentElement.dataset.theme = t;
+} catch (_) {}
+
+// ---------- PDF ----------
+// El botón cambia a la maqueta carta, redibuja las gráficas al nuevo ancho y abre
+// el diálogo de impresión ("Guardar como PDF"). Ctrl+P sigue el mismo camino.
+let tituloOriginal = document.title;
+function entrarImpresion() {
+  if (impresion()) return;
+  tituloOriginal = document.title;
+  const p = estado.params;
+  if (p) document.title = `ising_N${p.N}_T${p.T}`.replace(/\./g, "_");
+  document.body.classList.add("impresion");
+  renderTodo();
+}
+function salirImpresion() {
+  if (!impresion()) return;
+  document.body.classList.remove("impresion");
+  document.title = tituloOriginal;
+  renderTodo();
+}
+document.getElementById("boton-pdf").addEventListener("click", () => {
+  entrarImpresion();
+  requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+});
+window.addEventListener("beforeprint", entrarImpresion);
+window.addEventListener("afterprint", salirImpresion);
+
+let pendiente = null;
+window.addEventListener("resize", () => {
+  if (impresion()) return;
+  clearTimeout(pendiente);
+  pendiente = setTimeout(renderTodo, 150);
+});
+
+// ---------- Datos incrustados por ising::visor::instalar ----------
+if (window.DATOS_ISING) cargar(window.DATOS_ISING);
+</script>
+</body>
+</html>

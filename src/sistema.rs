@@ -224,6 +224,41 @@ impl Sistema {
         suma / self.elementos.len() as f64
     }
 
+    pub fn n(&self) -> usize {
+        self.elementos.len()
+    }
+
+    pub fn j(&self) -> f64 {
+        self.j
+    }
+
+    pub fn h(&self) -> f64 {
+        self.h
+    }
+
+    pub fn temp(&self) -> f64 {
+        self.temp
+    }
+
+    // Energía por espín: E/N = -(J/2) sum_i sum_{v(i)} s_i s_v - h sum_i s_i
+    // El 1/2 corrige que cada enlace aparece en la lista de vecinos de ambos extremos.
+    pub fn energia(&self) -> f64 {
+        let mut enlaces = 0.0;
+        let mut campo = 0.0;
+        for celda in self.elementos.iter() {
+            let mut suma_vecinos = 0.0;
+            for pos in celda.veclist.iter() {
+                if let Some(vcelda) = self.elementos.get(*pos) {
+                    suma_vecinos = suma_vecinos + vcelda.spin();
+                }
+            }
+            enlaces = enlaces + suma_vecinos * celda.spin();
+            campo = campo + celda.spin();
+        }
+
+        (-0.5 * self.j * enlaces - self.h * campo) / self.elementos.len() as f64
+    }
+
     pub fn c1(&self) -> f64 {
         let mut suma = 0.0;
         let mut pares = 0;
@@ -490,6 +525,7 @@ impl Sistema {
 }
 
 #[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
 pub enum Dinamica {
     Glauber,
     Metropolis
